@@ -37,6 +37,8 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
   background:linear-gradient(#e9d7a8,#d9c08a);transition:background .6s}
 #app.night #board{background:linear-gradient(#26364f,#1a2638)}
 #app.rain #board{box-shadow:inset 0 0 60px rgba(70,110,160,.45)}
+#app.storm #board{background:linear-gradient(#4a5260,#2c333d);box-shadow:inset 0 0 90px rgba(20,30,60,.7)}
+#hud .r1{overflow:hidden}
 #field{position:relative;width:100%;min-height:100%}
 #toolbar{flex:none;display:flex;gap:6px;padding:6px 8px;background:var(--hud);touch-action:manipulation}
 #toolbar button{flex:1;min-height:44px;border:0;border-radius:12px;background:#f3e7c7;color:#1d2b2f;font-size:14px;font-weight:700;font-family:inherit;touch-action:manipulation}
@@ -133,20 +135,20 @@ const $ = s => document.querySelector(s);
 const clamp = (v, a = 0, b = 100) => Math.max(a, Math.min(b, v));
 const pad = n => String(n).padStart(2, '0');
 const rnd = () => Math.random();
-const VERSION = 3;
+const VERSION = 4;
 const RUN_KEY = 'cardIsland.run.v1', META_KEY = 'cardIsland.meta.v1';
 
 /* ---------- 카드 종류 ---------- */
 const K = {
   beach:{n:'해변',e:'🏖️',cat:'place'}, sea:{n:'얕은 바다',e:'🌊',cat:'place'}, jungle:{n:'정글',e:'🌴',cat:'place'},
-  ledge:{n:'바위턱',e:'⛰️',cat:'place'}, base:{n:'기지',e:'🏕️',cat:'place'},
+  ledge:{n:'바위턱',e:'⛰️',cat:'place'}, base:{n:'기지',e:'🏕️',cat:'place'}, flat:{n:'갯벌',e:'🏝️',cat:'place'},
   valley:{n:'민물 계곡',e:'🏞️',cat:'place',locked:1}, cave:{n:'동굴',e:'🕳️',cat:'place',locked:1},
   stone:{n:'돌',e:'🪨',cat:'res'}, stick:{n:'나뭇가지',e:'🥢',cat:'res'}, leaf:{n:'잎',e:'🍃',cat:'res'},
   fiber:{n:'섬유',e:'🌾',cat:'res'}, vine:{n:'덩굴',e:'➰',cat:'res'}, bent:{n:'휜 가지',e:'🪃',cat:'res'},
   flint:{n:'부싯돌',e:'💠',cat:'res'}, plank:{n:'떠밀려 온 나무판',sn:'나무판',e:'🟫',cat:'res'},
-  log:{n:'통나무',e:'🪵',cat:'res'}, rope:{n:'노끈',e:'🧶',cat:'res'}, bone:{n:'생선뼈',e:'🦴',cat:'res'},
+  log:{n:'통나무',e:'🪵',cat:'res'}, bigclam:{n:'큰 조개',e:'🦪',cat:'res'}, rope:{n:'노끈',e:'🧶',cat:'res'}, bone:{n:'생선뼈',e:'🦴',cat:'res'},
   clam:{n:'조개',e:'🐚',cat:'food',eat:{h:5,sick:.10},cook:'clamc',raw:1},
-  clamc:{n:'구운 조개',e:'🦪',cat:'food',eat:{h:10},spoil:1440},
+  clamc:{n:'구운 조개',e:'🥘',cat:'food',eat:{h:10},spoil:1440},
   crab:{n:'게',e:'🦀',cat:'food',noRaw:1,cook:'crabc',spoil:720,raw:1},
   crabk:{n:'손질한 게',e:'🦀',cat:'food',noRaw:1,cook:'crabkc',spoil:720,raw:1},
   crabc:{n:'구운 게',e:'🍤',cat:'food',eat:{h:18},spoil:1440},
@@ -168,10 +170,11 @@ const K = {
   torchx:{n:'꺼진 횃불',e:'🕯️',cat:'dead'},
   ember:{n:'불씨',e:'✨',cat:'fire'}, fire:{n:'모닥불',e:'🔥',cat:'fire'}, firex:{n:'꺼진 모닥불',e:'🌫️',cat:'dead'},
   bed:{n:'침상',e:'🛏️',cat:'fac'}, catcher:{n:'빗물 받이',e:'🪣',cat:'fac'}, windbreak:{n:'바람막이',e:'⛺',cat:'fac'},
+  fence:{n:'울타리',e:'🚧',cat:'fac'}, hut:{n:'오두막',e:'🛖',cat:'fac'},
 };
 const KORDER = Object.keys(K);
-const FIXED = new Set(['beach','sea','jungle','ledge','base','valley','cave','fire','firex','bed','catcher','windbreak']);
-const PLACE_ORDER = ['beach','sea','jungle','ledge','base'];
+const FIXED = new Set(['beach','sea','flat','jungle','ledge','base','valley','cave','fire','firex','bed','catcher','windbreak','fence','hut']);
+const PLACE_ORDER = ['beach','sea','flat','jungle','ledge','base'];
 const CAT_ORDER = {fac:0, fire:1, dead:2, tool:3, food:4, water:5, res:6, place:7};
 
 /* ---------- 조합 ---------- */
@@ -187,6 +190,8 @@ const RECIPES = [
   {id:'bed', out:'bed', inp:{leaf:2}, t:10, e:1, unique:['bed','windbreak']},
   {id:'catcher', out:'catcher', inp:{leaf:2, stick:1}, t:10, e:1, unique:['catcher']},
   {id:'windbreak', out:'windbreak', inp:{bed:1, rope:1, stick:2}, t:40, e:5, unique:['windbreak']},
+  {id:'fence', out:'fence', inp:{log:3}, t:90, e:5, unique:['fence','hut']},
+  {id:'hut', out:'hut', inp:{fence:1, log:2, leaf:3}, t:180, e:15, unique:['hut']},
 ];
 // 도감 표시용 (모든 발견 가능 조합)
 const BOOK = [
@@ -208,7 +213,7 @@ const BOOK = [
   ['chop','🪵','통나무 베기','🔺 날 선 돌(60분) / 🔪 칼(40분) → 🌴 정글','sharp'],
   ['cleanfish','🐠','생선 손질','🔪 칼 → 🐟 생선 · 생선뼈 1','knife'],
   ['cleancrab','🦀','게 손질','🔪 칼 → 🦀 게','knife'],
-  ['cook_clamc','🦪','구운 조개','🐚 조개 → 🔥 모닥불 (20분)','campfire'],
+  ['cook_clamc','🥘','구운 조개','🐚 조개 → 🔥 모닥불 (20분)','campfire'],
   ['cook_crabc','🍤','구운 게','🦀 게 → 🔥 모닥불 (20분)','campfire'],
   ['cook_crabkc','🍤','손질 게구이','🦀 손질한 게 → 🔥 모닥불 (20분)','cleancrab'],
   ['cook_fishc','🍢','구운 생선','🐟 생선 → 🔥 모닥불 (20분)','campfire'],
@@ -217,6 +222,8 @@ const BOOK = [
   ['bed','🛏️','침상','🍃 잎 + 🍃 잎 · 쉬기 기운 +8/시간'],
   ['catcher','🪣','빗물 받이','🍃 잎 + 🍃 잎 + 🥢 나뭇가지 · 비 2시간마다 물 1잔 (최대 3)'],
   ['windbreak','⛺','바람막이','🛏️ 침상 + 🧶 노끈 + 🥢 나뭇가지 + 🥢 나뭇가지 · 쉬기 +9, 비 피해 절반','bed'],
+  ['fence','🚧','울타리','🪵 통나무 ×3 (한 장씩 쌓기) · 밤짐승 차단','chop'],
+  ['hut','🛖','오두막','🚧 울타리 + 🪵 통나무 ×2 + 🍃 잎 ×3 · 폭풍 차단, 쉬기 +12','fence'],
 ];
 const BOOK_IDS = new Set(BOOK.map(b => b[0]));
 
@@ -228,12 +235,14 @@ const TRAITS = [
   {id:'seaman', n:'바다 사람', cost:4, d:'낚시 기운 소모 −30%', cond:'첫 생선 낚기'},
   {id:'nighteye', n:'밤눈', cost:4, d:'밤 탐색 위험(부상·밤짐승) 절반', cond:'첫 밤 살피기'},
   {id:'map', n:'기억 속 지도', cost:5, d:'해변·얕은 바다·정글·바위턱 탐사도 30%로 시작', cond:'첫 장소 탐사도 100%'},
+  {id:'stormsense', n:'폭풍 감각', cost:4, d:'큰 폭풍 예고가 하루 전, 폭풍 중 체력 피해 절반', cond:'첫 폭풍 생존'},
 ];
 
 /* ---------- 장소 테이블 (13장) ---------- */
 function dropTable(k) {
   if (k === 'beach') return [['stone',25,'shore'],['stick',25,'shore'],['clam',20,'shore'],['crab',8,'shore'],['plank',4,'shore']];
   if (k === 'sea') return [['weed',30,'weed']];
+  if (k === 'flat') return [['clam',40,'all'],['crab',25,'all'],['bigclam',15,'all']];
   if (k === 'jungle') return [['leaf',25,'veg'],['fiber',25,'veg'],['stick',20,'veg'],['coco',12,'coco'],['vine',8,'veg'],['bent',5,'veg']];
   if (k === 'ledge') return S.rain ? [['stone',30,'rock'],['flint',25,'rock'],['egg',10,'egg'],['rainw',25,'rainw']]
                                    : [['stone',30,'rock'],['flint',25,'rock'],['egg',10,'egg'],['rainw',10,'rainw']];
@@ -243,6 +252,7 @@ function initPools() {
   return {
     beach:{exp:0, pools:{shore:[20,20]}},
     sea:{exp:0, pools:{weed:[8,8], fish:[12,12]}},
+    flat:{exp:0, pools:{all:[10,10]}},
     jungle:{exp:0, pools:{veg:[40,40], coco:[6,6], log:[12,12]}},
     ledge:{exp:0, pools:{rock:[25,25], egg:[3,3], rainw:[3,3]}},
   };
@@ -284,9 +294,9 @@ function mk(k) {
 function maxDur(c) { return K[c.k].dur + (c.k === 'drill' && hasTrait('firehand') ? 3 : 0); }
 
 function newGame(traits, naked) {
-  S = {v:VERSION, t:420, hp:100, energy:100, hunger:20, thirst:20, sick:0, injured:0, rain:false, rainStreak:0,
+  S = {v:VERSION, t:420, hp:100, energy:100, hunger:20, thirst:20, sick:0, injured:0, rain:false, rainStreak:0, storm:0, stormStart:0, stormEnd:0,
        stacks:[], places:initPools(), nid:1, dead:false, scored:false, lastCause:'',
-       life:{traits:traits || [], naked:!!naked, surv:0, newRecipes:[], newPlaces:[]}, log:[], flags:{}};
+       life:{traits:traits || [], naked:!!naked, surv:0, storms:0, newRecipes:[], newPlaces:[]}, log:[], flags:{}};
   for (const k of PLACE_ORDER) addStack([mk(k)], 0, 0);
   addStack([mk('coco')], 0, 0);
   if (hasTrait('stone')) addStack([mk('sharp')], 0, 0);
@@ -316,7 +326,52 @@ const clockStr = (t = S.t) => `${pad(Math.floor(mod(t) / 60))}:${pad(mod(t) % 60
 
 /* ---------- 시간 진행 (행동할 때만) ---------- */
 function dmg(v, cause) { S.hp -= v; S.lastCause = cause; if (S.hp <= 0) { S.hp = 0; S.dead = true; } }
+/* ---------- 조수 (14.2): 하루 2번 2시간, 매일 1시간씩 늦어지고 7일 주기 ---------- */
+function tideWindows(d) { const c = (d - 1) % 7, b = (d - 1) * 1440; return [[b + (9 + c) * 60, b + (11 + c) * 60], [b + (21 + c) * 60, b + (23 + c) * 60]]; }
+function lowTideEnd(t = S.t) { const d = day(t); for (const dd of [d - 1, d]) { if (dd < 1) continue; for (const [a, b] of tideWindows(dd)) if (t >= a && t < b) return b; } return 0; }
+function nextLowTide(t = S.t) { const d = day(t); for (const dd of [d, d + 1, d + 2]) for (const [a] of tideWindows(dd)) if (a > t) return a; return 0; }
+function isTideStart(t) { const d = day(t); for (const dd of [d - 1, d]) { if (dd < 1) continue; for (const [a] of tideWindows(dd)) if (a === t) return true; } return false; }
+const flatOpen = () => !!lowTideEnd() && !S.storm;
+const whenStr = t => `${day(t) !== day() ? (day(t) - day() === 1 ? '내일 ' : day(t) + '일차 ') : ''}${clockStr(t)}`;
+/* ---------- 폭풍 (14.2): 7일마다 큰 폭풍 12:00~다음 날 06:00, 비 사흘째면 작은 폭풍 06:00~18:00 ---------- */
+const isWet = () => S.rain || !!S.storm;
+const hasHut = () => !!findKind('hut');
+function stormWarn() { // 예보 문구 (폭풍 전)
+  if (S.storm) return '';
+  const d = day(), m = mod();
+  if (d % 7 === 0 && m >= 360 && m < 720) return '12:00 큰 폭풍';
+  if (hasTrait('stormsense') && (d + 1) % 7 === 0 && m >= 360) return '내일 큰 폭풍';
+  return '';
+}
+function startStorm(type, end) {
+  if (S.storm) { S.storm = 'big'; S.stormEnd = Math.max(S.stormEnd, end); say('⛈️ 폭풍이 큰 폭풍으로 커졌다! (내일 06:00까지)', 'bad'); return; }
+  S.storm = type; S.stormStart = S.t; S.stormEnd = end;
+  for (const st of S.stacks) for (const c of st.cards) {
+    if (c.k === 'catcher') c.water = 0;
+    if (c.k === 'fire' && !hasHut()) extinguish(c, st, '폭풍에');
+  }
+  say(`⛈️ ${type === 'big' ? '큰 폭풍' : '폭풍'}이 몰아친다! (${whenStr(end)}까지)${hasHut() ? ' 오두막 안은 안전하다.' : ' 오두막이 없으면 체력이 깎이고, 3시간 뒤 침상·바람막이가 부서진다.'}`, 'bad');
+}
+function endStorm() {
+  S.storm = 0; S.life.storms = (S.life.storms || 0) + 1;
+  say('🌤️ 폭풍이 지나갔다. 버텼다! (폭풍 버티기 +3 각인)', 'good');
+  appear('stormsense');
+}
+function stormMinute() {
+  const d = day(), m = mod();
+  if (S.storm && S.t >= S.stormEnd) endStorm();
+  if (d % 7 === 0 && m === 720) startStorm('big', S.t + 1080);
+  if (S.storm && !hasHut()) {
+    dmg(5 / 60 * (hasTrait('stormsense') ? .5 : 1), '폭풍');
+    if (S.t - S.stormStart === 180) {
+      const wreck = allCards().filter(c => c.k === 'bed' || c.k === 'windbreak');
+      if (wreck.length) { removeCards(wreck); say(`🌪️ 폭풍에 ${wreck.map(c => K[c.k].n).join('·')}이(가) 부서졌다.`, 'bad'); SND.q('break'); }
+    }
+    if (m % 60 === 0) for (const st of S.stacks) for (const c of st.cards) if (c.k === 'fire') extinguish(c, st, '폭풍에');
+  }
+}
 function restRate() {
+  if (findKind('hut')) return {r:12, nm:'오두막', hut:true};
   if (findKind('windbreak')) return {r:9, nm:'바람막이', wb:true};
   if (findKind('bed')) return {r:8, nm:'침상'};
   return {r:6, nm:'맨바닥'};
@@ -326,8 +381,9 @@ function advance(min, mode = 'awake') {
   for (let i = 0; i < min && !S.dead; i++) {
     S.t++;
     const m = mod();
-    S.hunger = clamp(S.hunger + (rest ? 2 : 4) / 60);
-    let th = (rest ? 2 : 5) / 60;
+    const sleepy = rest && !S.storm; // 폭풍 중에는 잠을 못 자서 깨어 있을 때 속도
+    S.hunger = clamp(S.hunger + (sleepy ? 2 : 4) / 60);
+    let th = (sleepy ? 2 : 5) / 60;
     if (S.sick > 0) { th *= 2; S.sick--; if (!S.sick) say('배탈이 가라앉았다.'); }
     S.thirst = clamp(S.thirst + th);
     if (S.hunger >= 100) dmg(4 / 60, '굶주림');
@@ -335,17 +391,22 @@ function advance(min, mode = 'awake') {
     if (S.injured > 0) { dmg(2 / 60, '부상'); S.injured--; if (!S.injured) say('부상이 나았다.', 'good'); }
     if (rest) {
       const rr = restRate(); let r = rr.r;
-      if (isNight()) r *= 1.25;
-      if (S.rain) r *= rr.wb ? .75 : .5;
+      if (S.storm) r = rr.hut ? 8 : 0; // 폭풍: 오두막이면 침상 수준, 아니면 회복 없음
+      else {
+        if (isNight()) r *= 1.25;
+        if (S.rain && !rr.hut) r *= rr.wb ? .75 : .5;
+      }
       if (S.hunger >= 80 || S.thirst >= 80) r *= .5;
       S.energy = clamp(S.energy + r / 60);
-      if (S.hunger < 70 && S.thirst < 70) S.hp = clamp(S.hp + 2 / 60);
+      if (S.hunger < 70 && S.thirst < 70 && (!S.storm || rr.hut)) S.hp = clamp(S.hp + (rr.hut ? 4 : 2) / 60);
     }
     tickCards();
+    stormMinute();
+    if (isTideStart(S.t)) { const p = S.places.flat.pools.all; p[0] = p[1]; if (!S.storm) say(`🏝️ 썰물! 갯벌이 열렸다 (${clockStr(S.t + 120)}까지)`); }
     if (m === 360) dawn();
     if (m === 1080) regenShore();
     if (m === 0) nightBeast();
-    if (S.rain && m % 60 === 0) rainHour(m);
+    if (isWet() && m % 60 === 0) rainHour(m);
   }
 }
 function tickCards() {
@@ -381,16 +442,20 @@ function dawn() {
   S.rain = rnd() < p;
   S.rainStreak = S.rain ? S.rainStreak + 1 : 0;
   if (!S.rain) { const r = S.places.ledge.pools.rainw; r[0] = Math.max(0, r[0] - 1); }
-  say(`🌅 ${d}일차 아침. 살아남았다 (생존 ${S.life.surv}일)${S.rain ? ' — 🌧️ 비가 온다' : ''}`, 'good');
+  say(`🌅 ${d}일차 아침. 살아남았다 (생존 ${S.life.surv}일)${S.rain ? ` — 🌧️ 비가 온다${S.rainStreak > 1 ? ` (${S.rainStreak}일째)` : ''}` : ''}`, 'good');
+  if (d % 7 === 0) say('⚠️ 오늘 12:00부터 내일 06:00까지 큰 폭풍이 온다! 오두막과 비축 식량·물을 준비하자.', 'bad');
+  else if (hasTrait('stormsense') && (d + 1) % 7 === 0) say('⚠️ (폭풍 감각) 내일 12:00 큰 폭풍이 온다.', 'bad');
+  if (S.rainStreak >= 3 && !S.storm) startStorm('small', S.t + 720);
 }
 function rainHour(m) {
   for (const st of S.stacks) for (const c of st.cards) {
     if (c.k === 'fire' && rnd() < .25) extinguish(c, st, '비에 젖어서');
-    if (m % 120 === 0 && c.k === 'catcher' && c.water < 3) c.water++;
+    if (m % 120 === 0 && c.k === 'catcher' && c.water < 3 && !S.storm) c.water++;
   }
   if (m % 120 === 0) { const r = S.places.ledge.pools.rainw; r[0] = Math.min(r[1], r[0] + 1); }
 }
 function nightBeast() {
+  if (findKind('fence') || findKind('hut')) return; // 울타리(오두막 포함)는 밤짐승 차단
   const d = day();
   let p = Math.min(.40, .10 + .02 * (d - 1));
   const foods = allCards().filter(c => K[c.k].cat === 'food');
@@ -413,7 +478,7 @@ function canAct(e) {
   return true;
 }
 function act(min, e, fn, mode) {
-  const cost = e * (S.rain ? 1.5 : 1);
+  const cost = e * (isWet() ? 1.5 : 1);
   S.energy = clamp(S.energy - cost);
   advance(min, mode);
   if (!S.dead && fn) fn();
@@ -452,8 +517,9 @@ function wear(c) {
 }
 function usableTorch() { return allCards().find(c => c.k === 'torch' && c.dur > 0); }
 function canExplore(k) {
+  if (k === 'flat') return flatOpen();
   if (!isNight() || k === 'beach' || k === 'base' || K[k].locked) return true;
-  return !!usableTorch() && !S.rain;
+  return !!usableTorch() && !isWet();
 }
 
 function explore(card) {
@@ -462,10 +528,11 @@ function explore(card) {
   if (K[k].locked) return toast(`${K[k].n}: 다음 빌드에서 열려요 (프로토타입 범위 밖)`);
   const night = isNight();
   let torch = null;
-  if (night && k !== 'beach') {
+  if (k === 'flat' && !flatOpen()) return toast(S.storm ? '⛈️ 폭풍 중에는 갯벌이 닫혀요.' : `🌊 물이 차 있어요. 다음 썰물 ${whenStr(nextLowTide())}`, 'bad');
+  if (night && k !== 'beach' && k !== 'flat') {
     torch = usableTorch();
-    if (!torch) return toast('🌙 밤에는 횃불 없이 해변만 살필 수 있어요.', 'bad');
-    if (S.rain) return toast('🌧️ 비가 와서 횃불을 쓸 수 없어요. 밤에는 해변만.', 'bad');
+    if (!torch) return toast('🌙 밤에는 횃불 없이 해변·갯벌만 살필 수 있어요.', 'bad');
+    if (isWet()) return toast('🌧️ 비가 와서 횃불을 쓸 수 없어요. 밤에는 해변·갯벌만.', 'bad');
   }
   if (!canAct(1)) return;
   const st = stackOf(card);
@@ -474,8 +541,11 @@ function explore(card) {
     if (torch) wear(torch);
     if (night) appear('nighteye');
     const P = S.places[k];
-    const before = P.exp; P.exp = Math.min(100, P.exp + 5);
-    if (before < 100 && P.exp >= 100) { say(`🗺️ ${K[k].n} 탐사 100%!`, 'good'); appear('map'); }
+    if (k !== 'flat') { // 갯벌은 탐사도 없음
+      const before = P.exp; P.exp = Math.min(100, P.exp + 5);
+      if (before < 100 && P.exp >= 100) { say(`🗺️ ${K[k].n} 탐사 100%!`, 'good'); appear('map'); }
+    }
+    if (S.storm) { dmg(10, '폭풍'); SND.q('hurt'); say('⛈️ 폭풍 속에서는 아무것도 찾지 못했다. 체력 −10', 'bad'); return; }
     // 결과 굴리기
     let roll = rnd() * 100, got = null;
     for (const [rk, pr, pool] of dropTable(k)) {
@@ -531,7 +601,9 @@ function openRest() {
   const rr = restRate(); const n = isNight();
   const m = mod(); const canSleep = m >= 1080 || m < 360;
   const toMorning = ((360 - m) + 1440) % 1440 || 1440;
-  let mult = []; if (n) mult.push('밤 ×1.25'); if (S.rain) mult.push(rr.wb ? '비 ×0.75' : '비 ×0.5');
+  let mult = [];
+  if (S.storm) mult.push(rr.hut ? '폭풍: 오두막 안 +8/시간' : '폭풍: 회복 없음, 체력 −5/시간');
+  else { if (n) mult.push('밤 ×1.25'); if (S.rain && !rr.hut) mult.push(rr.wb ? '비 ×0.75' : '비 ×0.5'); }
   if (S.hunger >= 80 || S.thirst >= 80) mult.push('배고픔/목마름 80↑ ×0.5');
   sheet(`<h2>🏕️ 기지에서 쉬기</h2>
     <p>자리: <b>${rr.nm}</b> (기운 +${rr.r}/시간${mult.length ? ', ' + mult.join(', ') : ''})<br>
@@ -594,6 +666,7 @@ function fixedInteraction(a, b, bst) {
     })};
   }
   if (bk === 'sea' && (ak === 'spear' || ak === 'rod')) {
+    if (S.storm) return {msg:'⛈️ 폭풍 중에는 낚시를 할 수 없어요.'};
     const sp = ak === 'spear';
     const t = sp ? 30 : 60, e = (sp ? 10 : 4) * (hasTrait('seaman') ? .7 : 1), ch = sp ? .6 : .7;
     return {e, run:() => act(t, e, () => {
@@ -616,7 +689,7 @@ function toolPair(tool, item, ist) {
   if (tk === 'drill' && ik === 'fiber')
     return {e:3, run:() => act(20, 3, () => {
       wear(tool);
-      const p = hasTrait('firehand') ? 1 : (S.rain ? .4 : .7);
+      const p = hasTrait('firehand') ? 1 : (isWet() ? .4 : .7);
       if (rnd() < p) { SND.q('ignite'); removeCards([item]); spawnAt(mk('ember'), ist); discover('ember'); appear('firehand'); say('✨ 불씨가 일었다! 30분 안에 써야 해요.', 'good'); }
       else { SND.q('fizzle'); say('🌀 불씨 실패… (손드릴 내구 −1, 섬유는 남음)', 'bad'); }
     })};
@@ -663,10 +736,8 @@ function handleDrop(drag, target, pos) {
   const combined = T.cards.concat(moving);
   const hasFixed = combined.some(c => FIXED.has(c.k));
   if (allSame(combined) && !hasFixed) {
-    if (T.cards.length === 1 && moving.length === 1) {
-      const r = exactRecipe(combined);
-      if (r) return craft(r, T, moving);
-    }
+    const r = exactRecipe(combined); // 돌+돌, 통나무 3장 등 같은 카드 조합은 개수가 정확히 맞을 때만
+    if (r) return craft(r, T, moving);
     return merge(T, src, drag.idx);
   }
   const r = exactRecipe(combined);
@@ -754,8 +825,10 @@ function sortBoard(silent) {
     items.forEach((st, i) => { st.x = D.gap + i * (D.cw + D.gap); st.y = y; h = Math.max(h, stackH(st)); out.push(st); });
     y += h + 10;
   };
-  for (let i = 0; i < places.length; i += 5) row(places.slice(i, i + 5));
-  const rest = fixed.concat(piles, mixed);
+  const baseSt = places.find(st => st.cards[0].k === 'base');
+  const prow = places.filter(st => st !== baseSt);
+  for (let i = 0; i < prow.length; i += 5) row(prow.slice(i, i + 5));
+  const rest = (baseSt ? [baseSt] : []).concat(fixed, piles, mixed);
   for (let i = 0; i < rest.length; i += 5) row(rest.slice(i, i + 5));
   S.stacks = out;
   if (!silent) { saveRun(); render(); }
@@ -780,6 +853,11 @@ function cardInner(c, st, i) {
   if (d.cat === 'place') {
     if (d.locked) { cls += ' locked'; ft = '준비 중'; }
     else if (c.k === 'base') { const rr = restRate(); ft = `탭: 쉬기<br>${rr.nm}`; }
+    else if (c.k === 'flat') {
+      const P = S.places.flat.pools.all, open = flatOpen();
+      ft = open ? `썰물 ~${clockStr(lowTideEnd())}<br>자원 ${P[0] / P[1] > .6 ? '많음' : P[0] / P[1] > .2 ? '조금' : '없음'}` : (S.storm ? '폭풍<br>닫힘' : `물 참<br>썰물 ${whenStr(nextLowTide())}`);
+      if (!open) cls += ' locked';
+    }
     else {
       const P = S.places[c.k]; let cur = 0, mx = 0;
       for (const [pk, p] of Object.entries(P.pools)) if (pk !== 'fish' && pk !== 'log') { cur += p[0]; mx += p[1]; }
@@ -794,6 +872,9 @@ function cardInner(c, st, i) {
   else if (c.k === 'ember') ft = `${Math.max(0, c.exp - S.t)}분 뒤<br>꺼짐`;
   else if (c.k === 'catcher') ft = `물 ${c.water}/3`;
   else if (c.k === 'bed' || c.k === 'windbreak') ft = `쉬기 +${c.k === 'bed' ? 8 : 9}`;
+  else if (c.k === 'hut') ft = '폭풍 차단<br>쉬기 +12';
+  else if (c.k === 'fence') ft = '밤짐승<br>차단';
+  else if (c.k === 'bigclam') ft = '조개 그릇<br>재료(다음)';
   else if (c.sp) { const h = Math.max(0, Math.ceil((c.sp - S.t) / 60)); ft = `${d.raw ? '날것 · ' : ''}${h}시간 뒤<br>상함`; }
   else if (d.eat) { ft = [d.eat.h ? `배고픔−${d.eat.h}` : '', d.eat.t ? `목마름−${d.eat.t}` : ''].filter(Boolean).join('<br>'); if (d.eat.sick && d.eat.sick < 1) ft += '<br>⚠ 배탈 위험'; }
   else if (d.closed) ft = '깨야 함';
@@ -835,9 +916,12 @@ function renderHud() {
   $('#clock').textContent = `${day()}일차 ${clockStr()}`;
   const n = isNight();
   $('#dn').textContent = n ? '🌙 밤' : '☀️ 낮';
-  $('#wx').textContent = S.rain ? '🌧️ 비' : '맑음';
+  const sw = stormWarn();
+  $('#wx').textContent = S.storm ? (S.storm === 'big' ? '⛈️ 큰 폭풍' : '⛈️ 폭풍') : (S.rain ? '🌧️ 비' : '맑음') + (sw ? ' ⚠️' + sw : '');
+  $('#wx').classList.toggle('warn', !!S.storm || !!sw);
+  $('#app').classList.toggle('storm', !!S.storm);
   $('#app').classList.toggle('night', n);
-  $('#app').classList.toggle('rain', S.rain);
+  $('#app').classList.toggle('rain', isWet());
   let fx = '';
   if (S.sick > 0) fx += `<span class="chip warn">🤢 배탈</span> `;
   if (S.injured > 0) fx += `<span class="chip warn">🩹 부상</span>`;
@@ -944,6 +1028,7 @@ function onTap(card) {
   if (d.eat || d.closed || d.noRaw) return eat(card);
   // 정보 표시만 (행동 없음)
   const tips = {
+    hut:'폭풍을 막아 줘요. 쉬기는 🏕️ 기지를 탭', fence:'밤짐승을 막아 줘요', bigclam:'조개 그릇 재료 (다음 빌드)',
     fire:'재료를 올리면 굽기, 나뭇가지·통나무는 연료, 꺼진 횃불은 다시 붙이기', firex:'✨ 불씨를 올리면 다시 피울 수 있어요',
     bed:'쉬기는 🏕️ 기지를 탭', windbreak:'쉬기는 🏕️ 기지를 탭', ember:'나뭇가지에 올리면 모닥불, 30분 안에 쓰세요',
     torchx:'🔥 모닥불에 올리면 다시 붙어요', sharp:'코코넛·정글에 올리거나 다른 재료와 조합', knife:'생선·게 손질, 코코넛, 정글(통나무)',
@@ -994,6 +1079,8 @@ function showHelp() {
       <li><b>시간은 행동할 때만 흘러요.</b> 생각하는 시간은 공짜.</li>
       <li>밤(18:00~06:00)에는 횃불 없이 해변만 살필 수 있어요. 음식을 두고 불 없이 밤을 보내면 멧돼지가 와요.</li>
       <li>날생선·고인 빗물은 배탈 위험. 굽거나 빗물 받이 물을 마셔요.</li>
+      <li>🏝️ <b>갯벌</b>은 썰물(하루 2번, 2시간) 때만 열려요. 썰물 시각은 매일 1시간씩 늦어져요.</li>
+      <li>⛈️ <b>7일마다 큰 폭풍</b>(12:00~다음 날 06:00), 비가 사흘 이어지면 작은 폭풍. 🛖 오두막(울타리 + 통나무 2 + 잎 3)이 없으면 체력이 깎이고 침상·불이 망가져요.</li>
       <li><b>정렬</b> 버튼: 카드를 종류별로 모아 정리.</li>
       <li>죽으면 생존 일수·새 조합·새 장소로 <b>각인 점수</b>를 얻고, 알아낸 조합은 남아요.</li>
     </ul>
@@ -1014,9 +1101,9 @@ function showMenu(keep) {
   if (keep) $('#sheet').innerHTML = html; else sheet(html);
 }
 function score() {
-  const L = S.life, rec = Math.min(5, L.newRecipes.length), plc = L.newPlaces.length * 2;
-  const base = L.surv + rec + plc;
-  return {surv:L.surv, rec, recRaw:L.newRecipes.length, plc, base, total:L.naked ? Math.floor(base * 1.5) : base};
+  const L = S.life, rec = Math.min(5, L.newRecipes.length), plc = L.newPlaces.length * 2, stm = (L.storms || 0) * 3;
+  const base = L.surv + rec + plc + stm;
+  return {surv:L.surv, rec, recRaw:L.newRecipes.length, plc, stm, base, total:L.naked ? Math.floor(base * 1.5) : base};
 }
 function die() {
   if (S.scored) return;
@@ -1039,6 +1126,7 @@ function showDeath() {
       <tr><td>생존 ${sc.surv}일 × 1</td><td>${sc.surv}</td></tr>
       <tr><td>새 조합 첫 발견 ${sc.recRaw}개 (한 삶 최대 5)</td><td>${sc.rec}</td></tr>
       <tr><td>새 장소 첫 발견 ${life.newPlaces.length}곳 × 2</td><td>${sc.plc}</td></tr>
+      <tr><td>폭풍 버티기 ${life.storms || 0}번 × 3</td><td>${sc.stm}</td></tr>
       ${life.naked ? `<tr><td>맨몸 시작 ×1.5 (내림)</td><td>×1.5</td></tr>` : ''}
       <tr><td><b>이번 삶 합계</b></td><td>+${sc.total}</td></tr>
       <tr><td>누적 각인 점수</td><td>${meta.points}</td></tr>
@@ -1311,10 +1399,10 @@ const SND = (() => {
     mix.day = dy; mix.dusk = dk; mix.night = nt;
     mix.cricket = Math.min(1, nt * .8 + dk * .6);
     mix.fire = S.stacks.some(st => st.cards.some(c => c.k === 'fire')) ? 1 : 0;
-    mix.rain = S.rain ? 1 : 0;
+    mix.rain = (S.rain || S.storm) ? 1 : 0;
     mix.storm = S.storm ? 1 : 0;
     // 7일차 큰 폭풍 전날 저녁(6·13·20…일차 17시~) 먼 천둥으로 예고. 폭풍 자체는 아직 미구현 (S.storm 이 생기면 비가 커지고 천둥이 잦아짐)
-    mix.thunder = mix.storm ? 1.6 : (d % 7 === 6 && m >= 1020) ? 1 : 0;
+    mix.thunder = mix.storm ? 1.6 : ((d % 7 === 6 && m >= 1020) || (d % 7 === 0 && m >= 360 && m < 720)) ? 1 : 0;
     mix.dead = S.dead ? 1 : 0;
     // 상태 위험 경고: 위험 구간에 새로 들어갈 때만
     const dg = {hp:S.hp <= 20, hunger:S.hunger >= 80, thirst:S.thirst >= 80, energy:S.energy <= 20};
@@ -1391,7 +1479,7 @@ function boot() {
   if (!meta.seenHelp) showHelp();
 }
 function sortBoardIfOff() { if (S.stacks.some(st => st.x + D.cw > D.W + 2)) sortBoard(true); }
-window.__game = {snd:SND, get S() { return S; }, get meta() { return meta; }, sortBoard, render, D, K, advance:(m) => { advance(m); after(); }};
+window.__game = {snd:SND, tide:{open:() => flatOpen(), windows:tideWindows}, get S() { return S; }, get meta() { return meta; }, sortBoard, render, D, K, advance:(m) => { advance(m); after(); }};
 boot();
 </script>
 </body>
