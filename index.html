@@ -21,6 +21,11 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
 #hud .r1 .sp{flex:1}
 #hud .chip{background:rgba(255,255,255,.12);border-radius:10px;padding:2px 7px;font-size:12px;font-weight:600}
 #hud .chip.warn{background:#b8442e}
+#hud button.chip{border:0;color:inherit;font:inherit;font-size:15px;min-width:40px;min-height:30px;padding:2px 8px;touch-action:manipulation}
+#sheet .seg{display:flex;gap:6px;align-items:center;margin:6px 0}
+#sheet .seg>span{width:58px;flex:none;font-weight:700;font-size:14px}
+#sheet .seg button{flex:1;min-height:42px;padding:0 4px}
+#sheet .seg button.on{background:#ffd36b;outline:2px solid #d9a400}
 #bars{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin-top:5px}
 .bar2{display:flex;align-items:center;gap:5px;font-size:11.5px}
 .bar2 .lb{width:44px;flex:none;opacity:.9}
@@ -107,7 +112,7 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
 <body>
 <div id="app">
   <header id="hud">
-    <div class="r1"><span id="clock">1일차 07:00</span><span id="dn" class="chip">☀️ 낮</span><span id="wx" class="chip">맑음</span><span id="fx"></span><span class="sp"></span><span id="pts" class="chip">✦ 0</span></div>
+    <div class="r1"><span id="clock">1일차 07:00</span><span id="dn" class="chip">☀️ 낮</span><span id="wx" class="chip">맑음</span><span id="fx"></span><span class="sp"></span><button id="bSnd" class="chip" aria-label="소리 켜기/끄기">🔊</button><span id="pts" class="chip">✦ 0</span></div>
     <div id="bars"></div>
   </header>
   <main id="board"><div id="field"></div></main>
@@ -300,7 +305,7 @@ function removeCards(list) {
 /* ---------- 메시지 ---------- */
 function logMsg(m) { S.log.push(`[${day()}일 ${clockStr()}] ${m}`); if (S.log.length > 80) S.log.shift(); }
 function say(m, type = '') { pending.push([m, type]); logMsg(m); }
-function flush() { for (const [m, t] of pending) toast(m, t); pending = []; }
+function flush() { for (const [m, t] of pending) toast(m, t); pending = []; SND.flushQ(); }
 function toast(m, type = '') {
   const box = $('#toasts');
   while (box.children.length >= 4) box.firstChild.remove();
@@ -350,7 +355,7 @@ function tickCards() {
       c.fuel--;
       if (c.cook && S.t >= c.cook.until) {
         const out = K[c.cook.k].cook; const nc = mk(out);
-        spawnNear(nc, st); c.cook = null; discover('cook_' + out);
+        spawnNear(nc, st); c.cook = null; discover('cook_' + out); SND.q('catch');
         say(`${K[out].e} ${K[out].n} 완성!`, 'good');
       }
       if (c.fuel <= 0) extinguish(c, st, '연료가 다 타서');
@@ -360,7 +365,7 @@ function tickCards() {
   if (rm.length) removeCards(rm);
 }
 function extinguish(c, st, why) {
-  c.k = 'firex'; c.fuel = 0;
+  c.k = 'firex'; c.fuel = 0; SND.q('fizzle');
   if (c.cook) { spawnNear(mk(c.cook.k), st); c.cook = null; }
   say(`🔥 모닥불이 꺼졌다 (${why}).`, 'bad');
 }
@@ -396,7 +401,7 @@ function nightBeast() {
     const stolen = [];
     for (let i = 0; i < n; i++) { const idx = Math.floor(rnd() * foods.length); stolen.push(foods.splice(idx, 1)[0]); }
     removeCards(stolen);
-    dmg(15, '멧돼지');
+    dmg(15, '멧돼지'); SND.q('boar');
     say(`🐗 한밤중에 멧돼지가 기지를 덮쳤다! 체력 −15${stolen.length ? ' · 빼앗김: ' + stolen.map(c => K[c.k].n).join(', ') : ''}`, 'bad');
   }
 }
@@ -422,7 +427,7 @@ function after() {
 }
 function discover(id) {
   if (!BOOK_IDS.has(id) || meta.discovered[id]) return;
-  meta.discovered[id] = 1; S.life.newRecipes.push(id); saveMeta();
+  meta.discovered[id] = 1; S.life.newRecipes.push(id); saveMeta(); SND.q('discover');
   const b = BOOK.find(x => x[0] === id);
   pending.push([`📖 새 조합 발견! ${b[1]} ${b[2]}`, 'disc']);
 }
@@ -434,14 +439,15 @@ function appear(tid) {
 }
 function getSick() {
   S.thirst = clamp(S.thirst + 20); S.energy = clamp(S.energy - 15); S.sick = 360;
+  SND.q('sick');
   say('🤢 배탈이 났다! 목마름 +20, 기운 −15, 6시간 동안 목마름 2배', 'bad');
   appear('stomach');
 }
 function wear(c) {
   c.dur--;
   if (c.dur <= 0) {
-    if (c.k === 'torch') { c.k = 'torchx'; delete c.dur; say('🕯️ 횃불이 다 탔다 → 꺼진 횃불 (모닥불에 올리면 다시 붙음)'); }
-    else { removeCards([c]); say(`${K[c.k].e} ${K[c.k].n}이(가) 부서졌다.`, 'bad'); }
+    if (c.k === 'torch') { SND.q('fizzle'); c.k = 'torchx'; delete c.dur; say('🕯️ 횃불이 다 탔다 → 꺼진 횃불 (모닥불에 올리면 다시 붙음)'); }
+    else { removeCards([c]); SND.q('break'); say(`${K[c.k].e} ${K[c.k].n}이(가) 부서졌다.`, 'bad'); }
   }
 }
 function usableTorch() { return allCards().find(c => c.k === 'torch' && c.dur > 0); }
@@ -464,6 +470,7 @@ function explore(card) {
   if (!canAct(1)) return;
   const st = stackOf(card);
   act(30, night ? 6 : 4, () => {
+    SND.q('explore_' + k);
     if (torch) wear(torch);
     if (night) appear('nighteye');
     const P = S.places[k];
@@ -480,8 +487,8 @@ function explore(card) {
     // 위험
     const nr = hasTrait('nighteye') ? .5 : 1;
     let inj = night ? (k === 'ledge' ? .12 : .08) * nr : (k === 'ledge' ? .04 : 0);
-    if (rnd() < inj) { S.injured = 1440; say('🩹 다쳤다! 24시간 동안 체력이 서서히 줄어든다.', 'bad'); }
-    if (night && rnd() < .05 * nr) { dmg(10, '밤짐승'); say('🐗 어둠 속에서 짐승과 마주쳤다! 체력 −10', 'bad'); }
+    if (rnd() < inj) { SND.q('hurt'); S.injured = 1440; say('🩹 다쳤다! 24시간 동안 체력이 서서히 줄어든다.', 'bad'); }
+    if (night && rnd() < .05 * nr) { SND.q('boar'); dmg(10, '밤짐승'); say('🐗 어둠 속에서 짐승과 마주쳤다! 체력 −10', 'bad'); }
   });
 }
 function checkPlaces() {
@@ -504,6 +511,7 @@ function eat(card) {
   const verb = d.cat === 'water' ? '마셨다' : '먹었다';
   removeCards([card]);
   act(5, 0, () => {
+    SND.q(d.cat === 'water' ? 'drink' : 'eat');
     if (d.eat.h) S.hunger = clamp(S.hunger - d.eat.h);
     if (d.eat.t) S.thirst = clamp(S.thirst - d.eat.t);
     say(`${d.e} ${d.n}을(를) ${verb}.${d.eat.h ? ' 배고픔 −' + d.eat.h : ''}${d.eat.t ? ' 목마름 −' + d.eat.t : ''}`);
@@ -513,7 +521,7 @@ function eat(card) {
 function drinkCatcher(card) {
   if (!card.water) return toast('🪣 빗물 받이가 비어 있어요. 비가 오면 2시간마다 1잔씩 찹니다.');
   card.water--;
-  act(5, 0, () => { S.thirst = clamp(S.thirst - 25); say('🪣 빗물을 마셨다. 목마름 −25'); });
+  act(5, 0, () => { SND.q('drink'); S.thirst = clamp(S.thirst - 25); say('🪣 빗물을 마셨다. 목마름 −25'); });
 }
 
 /* ---------- 쉬기 ---------- */
@@ -561,19 +569,19 @@ function fixedInteraction(a, b, bst) {
   if (bk === 'fire') {
     if (K[ak].cook) {
       if (b.cook) return {msg:'🔥 이미 굽는 중이에요 (모닥불 조리 1개).'};
-      return {run:() => { removeCards([a]); b.cook = {k:ak, until:S.t + 20}; say(`${K[ak].e} ${K[ak].n}을(를) 불에 올렸다. 20분 뒤 익음 (다른 행동·쉬기로 시간이 흘러야 함)`); after(); }};
+      return {run:() => { removeCards([a]); b.cook = {k:ak, until:S.t + 20}; SND.q('stack'); say(`${K[ak].e} ${K[ak].n}을(를) 불에 올렸다. 20분 뒤 익음 (다른 행동·쉬기로 시간이 흘러야 함)`); after(); }};
     }
     if (ak === 'stick' || ak === 'plank' || ak === 'log') {
-      return {run:() => { const add = ak === 'log' ? 360 : 120; removeCards([a]); b.fuel = Math.min(720, b.fuel + add); discover('fuel'); say(`🔥 연료 +${add / 60}시간 (남은 연료 ${fmtH(b.fuel)})`); after(); }};
+      return {run:() => { const add = ak === 'log' ? 360 : 120; removeCards([a]); b.fuel = Math.min(720, b.fuel + add); discover('fuel'); SND.q('fuel'); say(`🔥 연료 +${add / 60}시간 (남은 연료 ${fmtH(b.fuel)})`); after(); }};
     }
     if (ak === 'torchx' || (ak === 'torch' && a.dur < 4)) {
-      return {e:0, run:() => { act(5, 0, () => { a.k = 'torch'; a.dur = 4; discover('relight'); say('🕯️ 횃불이 다시 붙었다 (내구 4).', 'good'); }); }};
+      return {e:0, run:() => { act(5, 0, () => { a.k = 'torch'; a.dur = 4; discover('relight'); SND.q('ignite'); say('🕯️ 횃불이 다시 붙었다 (내구 4).', 'good'); }); }};
     }
     if (ak === 'ember') return {msg:'이미 타고 있어요.'};
     return {msg:'불에 올릴 수 없는 카드예요.'};
   }
   if (bk === 'firex') {
-    if (ak === 'ember') return {e:1, run:() => { removeCards([a]); act(10, 1, () => { b.k = 'fire'; b.fuel = 180; discover('relightfire'); say('🔥 모닥불을 다시 피웠다 (연료 3시간).', 'good'); }); }};
+    if (ak === 'ember') return {e:1, run:() => { removeCards([a]); act(10, 1, () => { b.k = 'fire'; b.fuel = 180; discover('relightfire'); SND.q('ignite'); say('🔥 모닥불을 다시 피웠다 (연료 3시간).', 'good'); }); }};
     return null;
   }
   if (bk === 'jungle' && (ak === 'sharp' || ak === 'knife')) {
@@ -582,7 +590,7 @@ function fixedInteraction(a, b, bst) {
       const p = S.places.jungle.pools.log;
       wear(a);
       if (p[0] <= 0) return say('🌴 벨 만한 나무가 없다 (통나무 고갈).', 'bad');
-      p[0]--; spawnNear(mk('log'), bst); discover('chop'); say(`🪵 통나무를 베었다 (${t}분).`);
+      p[0]--; SND.q('chop'); spawnNear(mk('log'), bst); discover('chop'); say(`🪵 통나무를 베었다 (${t}분).`);
     })};
   }
   if (bk === 'sea' && (ak === 'spear' || ak === 'rod')) {
@@ -591,10 +599,10 @@ function fixedInteraction(a, b, bst) {
     return {e, run:() => act(t, e, () => {
       wear(a);
       const p = S.places.sea.pools.fish;
-      discover(sp ? 'fish_spear' : 'fish_rod');
-      if (p[0] > 0 && rnd() < ch) { p[0]--; spawnNear(mk('fish'), bst); say(`🐟 물고기를 잡았다! (${sp ? '창' : '낚싯대'})`, 'good'); appear('seaman'); }
+      discover(sp ? 'fish_spear' : 'fish_rod'); SND.q('splash');
+      if (p[0] > 0 && rnd() < ch) { p[0]--; spawnNear(mk('fish'), bst); SND.q('catch'); say(`🐟 물고기를 잡았다! (${sp ? '창' : '낚싯대'})`, 'good'); appear('seaman'); }
       else say(p[0] > 0 ? '🌊 놓쳤다…' : '🌊 물고기가 보이지 않는다 (어획 고갈).');
-      if (sp && !isNight() && rnd() < .03) { S.injured = 1440; say('🩹 창 낚시 중 다쳤다!', 'bad'); }
+      if (sp && !isNight() && rnd() < .03) { SND.q('hurt'); S.injured = 1440; say('🩹 창 낚시 중 다쳤다!', 'bad'); }
     })};
   }
   if (K[bk].cat === 'place') return {msg: bk === 'base' ? '🏕️ 기지는 탭하면 쉬기예요.' : '장소는 탭해서 살펴요. (도구: 정글←날 선 돌/칼, 얕은 바다←창/낚싯대)'};
@@ -604,17 +612,17 @@ function fixedInteraction(a, b, bst) {
 function toolPair(tool, item, ist) {
   const tk = tool.k, ik = item.k;
   if ((tk === 'sharp' || tk === 'knife') && ik === 'coco')
-    return {e:0, run:() => { removeCards([item]); act(10, 0, () => { wear(tool); spawnAt(mk('cocoo'), ist); discover('opencoco'); say('🥥 코코넛을 깼다.'); }); }};
+    return {e:0, run:() => { removeCards([item]); act(10, 0, () => { wear(tool); SND.q('chop'); spawnAt(mk('cocoo'), ist); discover('opencoco'); say('🥥 코코넛을 깼다.'); }); }};
   if (tk === 'drill' && ik === 'fiber')
     return {e:3, run:() => act(20, 3, () => {
       wear(tool);
       const p = hasTrait('firehand') ? 1 : (S.rain ? .4 : .7);
-      if (rnd() < p) { removeCards([item]); spawnAt(mk('ember'), ist); discover('ember'); appear('firehand'); say('✨ 불씨가 일었다! 30분 안에 써야 해요.', 'good'); }
-      else say('🌀 불씨 실패… (손드릴 내구 −1, 섬유는 남음)', 'bad');
+      if (rnd() < p) { SND.q('ignite'); removeCards([item]); spawnAt(mk('ember'), ist); discover('ember'); appear('firehand'); say('✨ 불씨가 일었다! 30분 안에 써야 해요.', 'good'); }
+      else { SND.q('fizzle'); say('🌀 불씨 실패… (손드릴 내구 −1, 섬유는 남음)', 'bad'); }
     })};
   if (tk === 'knife' && (ik === 'fish' || ik === 'crab'))
     return {e:0, run:() => { removeCards([item]); act(10, 0, () => {
-      wear(tool);
+      wear(tool); SND.q('chop');
       if (ik === 'fish') { const n = mk('fishk'); n.sp = item.sp; spawnAt(n, ist); spawnNear(mk('bone'), ist); discover('cleanfish'); say('🔪 생선을 손질했다. 생선뼈 1'); }
       else { const n = mk('crabk'); n.sp = item.sp; spawnAt(n, ist); discover('cleancrab'); say('🔪 게를 손질했다.'); }
     }); }};
@@ -634,16 +642,17 @@ function handleDrop(drag, target, pos) {
     src.cards.splice(drag.idx);
     if (!src.cards.length) S.stacks.splice(S.stacks.indexOf(src), 1);
     const st = addStack(moving, clamp(pos.x, 0, D.W - D.cw), Math.max(0, pos.y));
+    SND.play('drop');
     return after();
   }
-  if (target === src) return render();
+  if (target === src) { SND.play('drop'); return render(); }
   const T = target, tRoot = T.cards[0], tTop = T.cards[T.cards.length - 1];
   const a = moving[moving.length - 1];
   // 1) 고정 카드 위
   if (FIXED.has(tRoot.k) && T.cards.length === 1) {
     const r = fixedInteraction(a, tRoot, T);
     if (r && r.run) { if (!canAct(r.e || 0)) return render(); r.run(); return; }
-    if (r && r.msg) { toast(r.msg); return render(); }
+    if (r && r.msg) { toast(r.msg); SND.play('reject'); return render(); }
   }
   // 2) 도구 + 재료
   if (allSame(moving) && allSame(T.cards) && !FIXED.has(tTop.k) && !FIXED.has(a.k)) {
@@ -673,16 +682,18 @@ function handleDrop(drag, target, pos) {
       if (!src.cards.length) S.stacks.splice(S.stacks.indexOf(src), 1);
       const p = findFree(T.x, T.y + D.cellH);
       addStack(one, p.x, p.y);
+      SND.play('stack');
       return after();
     }
   }
-  toast('함께 쌓을 수 없는 카드예요.');
+  toast('함께 쌓을 수 없는 카드예요.'); SND.play('reject');
   render();
 }
 function merge(T, src, idx) {
   const moving = src.cards.splice(idx);
   if (!src.cards.length) S.stacks.splice(S.stacks.indexOf(src), 1);
   T.cards.push(...moving);
+  SND.play('stack');
   S.stacks.splice(S.stacks.indexOf(T), 1); S.stacks.push(T);
   after();
 }
@@ -695,6 +706,7 @@ function craft(r, T, moving) {
     const c = mk(r.out);
     if (!overlapsAny({x:pos.x, y:pos.y, w:D.cw, h:D.ch})) addStack([c], pos.x, pos.y); else spawnNear(c, {x:pos.x, y:pos.y, cards:[]});
     discover(r.id);
+    SND.q(r.out === 'fire' || r.out === 'torch' ? 'ignite' : 'craft');
     say(`${K[r.out].e} ${K[r.out].n} 완성 (${r.t}분)`);
   });
 }
@@ -819,6 +831,7 @@ function render() {
   renderHud();
 }
 function renderHud() {
+  SND.update(S);
   $('#clock').textContent = `${day()}일차 ${clockStr()}`;
   const n = isNight();
   $('#dn').textContent = n ? '🌙 밤' : '☀️ 낮';
@@ -869,6 +882,7 @@ window.addEventListener('pointerup', e => endPointer(e, false));
 window.addEventListener('pointercancel', e => endPointer(e, true));
 function startDrag(e) {
   drag.moved = true;
+  SND.play('pickup');
   const st = drag.stack;
   drag.cards = st.cards.slice(drag.idx);
   drag.ids = new Set(drag.cards.map(c => c.id));
@@ -986,10 +1000,18 @@ function showHelp() {
     <div class="btns"><button class="pri" data-close>시작하기</button></div>`);
   meta.seenHelp = 1; saveMeta();
 }
-function showMenu() {
+function sndMenuHTML() {
+  const st = SND.settings, lv = [[0, '끔'], [.35, '작게'], [.7, '보통'], [1, '크게']];
+  const row = (w, nm) => `<div class="seg"><span>${nm}</span>${lv.map(([v, l]) => `<button data-act="vol" data-w="${w}" data-v="${v}" class="${Math.abs(st[w] - v) < .01 ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  return `<h3>🔊 사운드</h3><div class="seg"><span>소리</span><button data-act="snd" class="${st.on ? 'on' : ''}">${st.on ? '🔊 켜짐' : '🔇 꺼짐'}</button></div>${row('bgm', '배경음')}${row('sfx', '효과음')}
+    <p class="muted">낮에는 파도·새·바람, 밤에는 바람·풀벌레·먼 짐승 소리. 모닥불이 켜져 있으면 밤 소리가 가라앉아요. 아이폰은 무음 스위치를 켜면 소리가 나지 않을 수 있어요.</p>`;
+}
+function showMenu(keep) {
   $('#sheet').dataset.modal = '';
-  sheet(`<h2>메뉴</h2><p class="muted">각인 점수 ${meta.points} · 지난 삶 ${meta.lives}번 · 최고 생존 ${meta.bestDays}일 · 알아낸 조합 ${Object.keys(meta.discovered).length}/${BOOK.length}</p>
-    <div class="btns"><button data-act="giveup">이번 삶 포기 (정산)</button><button data-act="wipe">전체 기록 초기화</button><button data-close>닫기</button></div>`);
+  const html = `<h2>메뉴</h2><p class="muted">각인 점수 ${meta.points} · 지난 삶 ${meta.lives}번 · 최고 생존 ${meta.bestDays}일 · 알아낸 조합 ${Object.keys(meta.discovered).length}/${BOOK.length}</p>
+    ${sndMenuHTML()}
+    <div class="btns"><button data-act="giveup">이번 삶 포기 (정산)</button><button data-act="wipe">전체 기록 초기화</button><button data-close>닫기</button></div>`;
+  if (keep) $('#sheet').innerHTML = html; else sheet(html);
 }
 function score() {
   const L = S.life, rec = Math.min(5, L.newRecipes.length), plc = L.newPlaces.length * 2;
@@ -1004,6 +1026,7 @@ function die() {
   saveMeta(); saveRun();
 }
 function showDeath() {
+  SND.play('death');
   $('#toasts').innerHTML = '';
   const sc = S.final || score();
   const life = S.life;
@@ -1044,6 +1067,8 @@ function showTraits() {
     <div class="btns"><button class="pri" data-act="go">출발 (${pickNaked ? '맨몸' : pickTraits.map(id => TRAITS.find(t => t.id === id).n).join(', ') || '특성 없음'})</button></div>`);
 }
 const ACTIONS = {
+  snd() { SND.setOn(!SND.settings.on); syncSndBtn(); showMenu(true); },
+  vol(b) { SND.setVol(b.dataset.w, +b.dataset.v); showMenu(true); setTimeout(() => SND.play(b.dataset.w === 'sfx' ? 'craft' : 'pickup'), 60); },
   restart() { pickTraits = (meta.lastTraits || []).filter(id => meta.unlocked[id]); pickNaked = false; showTraits(); },
   unlock(b) { const t = TRAITS.find(x => x.id === b.dataset.id); if (meta.points >= t.cost && !meta.unlocked[t.id]) { meta.points -= t.cost; meta.unlocked[t.id] = 1; saveMeta(); } showTraits(); },
   pick(b) { const id = b.dataset.id; if (pickTraits.includes(id)) pickTraits = pickTraits.filter(x => x !== id); else if (pickTraits.length < slots()) { pickTraits.push(id); pickNaked = false; } else toast('슬롯이 가득 찼어요.'); showTraits(); },
@@ -1058,7 +1083,8 @@ $('#bSort').addEventListener('click', () => { if (S && !S.dead) { sortBoard(); t
 $('#bBook').addEventListener('click', showBook);
 $('#bLog').addEventListener('click', showLog);
 $('#bHelp').addEventListener('click', showHelp);
-$('#bMenu').addEventListener('click', showMenu);
+$('#bMenu').addEventListener('click', () => showMenu());
+$('#bSnd').addEventListener('click', () => { SND.setOn(!SND.settings.on); syncSndBtn(); toast(SND.settings.on ? '🔊 소리 켬' : '🔇 소리 끔'); });
 document.addEventListener('touchmove', e => { if (drag) e.preventDefault(); }, {passive:false});
 document.addEventListener('gesturestart', e => e.preventDefault());
 document.addEventListener('contextmenu', e => { if (e.target.closest('.card')) e.preventDefault(); });
@@ -1066,9 +1092,295 @@ document.addEventListener('dblclick', e => e.preventDefault());
 window.addEventListener('resize', () => { const w = D.W; measure(); if (S && Math.abs(w - D.W) > 2) sortBoard(true); render(); });
 window.addEventListener('error', e => toast('오류: ' + e.message, 'bad'));
 
+/* ---------- 사운드 (Web Audio 합성만 사용, 외부 파일 없음) ---------- */
+const SND = (() => {
+  const KEY = 'cardIsland.sound.v1';
+  const set = {on:true, bgm:.7, sfx:.7};
+  try { Object.assign(set, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(set)); } catch (e) {} };
+  let ctx = null, master, amb, sfx, white, brown, timer = null, unlocked = false, voices = 0, built = false;
+  const L = {};
+  const MAXV = 16;          // 동시 재생 상한 (단발음)
+  const SFXB = 1.5;         // 효과음이 배경에 묻히지 않게 살짝 올림
+  const nextAt = {};
+  const mix = {day:1, dusk:0, night:0, cricket:0, fire:0, rain:0, storm:0, thunder:0, dead:0};
+  let applied = '';
+  let prevDanger = null;
+  const qset = [];
+  const now = () => ctx.currentTime;
+  const R = (a, b) => a + Math.random() * (b - a);
+
+  function noiseBuf(kind, sec) {
+    const n = Math.floor(ctx.sampleRate * sec), b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0);
+    let last = 0, mx = 0;
+    for (let i = 0; i < n; i++) {
+      const w = Math.random() * 2 - 1;
+      if (kind === 'brown') { last = (last + .02 * w) / 1.02; d[i] = last; } else d[i] = w;
+      mx = Math.max(mx, Math.abs(d[i]));
+    }
+    if (kind === 'brown') for (let i = 0; i < n; i++) d[i] /= mx; // 정규화
+    return b;
+  }
+  function lfo(freq, amount, param) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = freq; g.gain.value = amount; o.connect(g); g.connect(param); o.start(); return o;
+  }
+  // 반복 재생 배경 레이어: 버퍼 → 필터들 → 스웰 → 레벨 → 배경음 버스
+  function layer(buf, filters, swellBase) {
+    const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true;
+    let node = s;
+    const fs = filters.map(([type, f, q]) => { const fl = ctx.createBiquadFilter(); fl.type = type; fl.frequency.value = f; fl.Q.value = q || .7; node.connect(fl); node = fl; return fl; });
+    const swell = ctx.createGain(); swell.gain.value = swellBase; node.connect(swell);
+    const g = ctx.createGain(); g.gain.value = 0; swell.connect(g); g.connect(amb);
+    s.start(0, Math.random() * (buf.duration - .1));
+    return {s, fs, swell, g};
+  }
+  function build() {
+    master = ctx.createGain(); master.gain.value = set.on ? 1 : 0;
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -20; comp.knee.value = 12; comp.ratio.value = 4; comp.attack.value = .005; comp.release.value = .3;
+    master.connect(comp); comp.connect(ctx.destination);
+    amb = ctx.createGain(); amb.gain.value = set.bgm; amb.connect(master);
+    sfx = ctx.createGain(); sfx.gain.value = set.sfx * SFXB; sfx.connect(master);
+    white = noiseBuf('white', 2); brown = noiseBuf('brown', 4);
+    // 낮: 파도 (느린 스웰), 잎·바람 바스락
+    L.waves = layer(brown, [['lowpass', 520, .5]], .55);
+    lfo(.075, .4, L.waves.swell.gain); lfo(.075, 260, L.waves.fs[0].frequency);
+    L.leaves = layer(white, [['bandpass', 3300, .6]], .5);
+    lfo(.13, .45, L.leaves.swell.gain);
+    // 밤: 낮은 바람 드론 + 아주 작은 저음
+    L.wind = layer(brown, [['lowpass', 230, .9]], .6);
+    lfo(.045, .35, L.wind.swell.gain); lfo(.03, 110, L.wind.fs[0].frequency);
+    const dr = ctx.createOscillator(); dr.type = 'sine'; dr.frequency.value = 73.4;
+    L.drone = {g:ctx.createGain()}; L.drone.g.gain.value = 0; dr.connect(L.drone.g); L.drone.g.connect(amb); dr.start();
+    lfo(.11, 1.5, dr.frequency);
+    // 모닥불 바닥 소리 (탁탁 튀는 소리는 이벤트로)
+    L.fire = layer(brown, [['bandpass', 800, .6]], .7);
+    lfo(.6, .25, L.fire.swell.gain);
+    // 비
+    L.rain = layer(white, [['highpass', 650, .5], ['lowpass', 6500, .5]], .8);
+    lfo(.09, .15, L.rain.swell.gain);
+    built = true; applied = ''; apply();
+  }
+  function ensure() {
+    if (!set.on) return false;
+    try {
+      if (!ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return false;
+        try { ctx = new AC({latencyHint:'playback'}); } catch (e) { ctx = new AC(); }
+        build();
+      }
+      if (ctx.state !== 'running' && !document.hidden) ctx.resume().catch(() => {});
+      if (!unlocked) { // iOS: 무음 버퍼 한 번 재생해서 잠금 해제
+        const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0); unlocked = true;
+      }
+      startTimer();
+      return true;
+    } catch (e) { console.warn('audio', e); return false; }
+  }
+  const live = () => ctx && built && set.on && ctx.state === 'running';
+  function track(src, last) { voices++; src.onended = () => { voices--; try { last.disconnect(); } catch (e) {} }; }
+  function dest(bus, pan) {
+    if (pan && ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = pan; p.connect(bus); return p; }
+    return bus;
+  }
+  function env(g, t, a, v, d) {
+    g.gain.setValueAtTime(.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(.0002, v), t + a);
+    g.gain.exponentialRampToValueAtTime(.0001, t + a + d);
+  }
+  function tone(o) {
+    const {f, f2, t = now(), a = .005, d = .15, type = 'sine', v = .1, bus = sfx, pan = 0, lp, cap = MAXV} = o;
+    if (voices >= cap) return;
+    const os = ctx.createOscillator(); os.type = type; os.frequency.setValueAtTime(f, t);
+    if (f2) os.frequency.exponentialRampToValueAtTime(f2, t + a + d);
+    const g = ctx.createGain(); env(g, t, a, v, d);
+    let n = os; if (lp) { const fl = ctx.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = lp; os.connect(fl); n = fl; }
+    n.connect(g); g.connect(dest(bus, pan));
+    os.start(t); os.stop(t + a + d + .05); track(os, g);
+  }
+  function noise(o) {
+    const {t = now(), a = .003, d = .05, type = 'bandpass', f = 1000, f2, q = 1, v = .1, bus = sfx, pan = 0, buf = white, cap = MAXV} = o;
+    if (voices >= cap) return;
+    const s = ctx.createBufferSource(); s.buffer = buf;
+    const fl = ctx.createBiquadFilter(); fl.type = type; fl.frequency.setValueAtTime(f, t); fl.Q.value = q;
+    if (f2) fl.frequency.exponentialRampToValueAtTime(f2, t + a + d);
+    const g = ctx.createGain(); env(g, t, a, v, d);
+    s.connect(fl); fl.connect(g); g.connect(dest(bus, pan));
+    s.start(t, Math.random() * (buf.duration - 1)); s.stop(t + a + d + .05); track(s, g);
+  }
+
+  /* --- 효과음 --- */
+  const FX = {
+    pickup(t) { tone({t, f:480, f2:720, d:.07, v:.07, type:'triangle'}); noise({t, f:3000, d:.02, v:.03}); },
+    drop(t) { noise({t, type:'lowpass', f:900, d:.07, v:.16}); tone({t, f:170, f2:110, d:.08, v:.08}); },
+    stack(t) { FX.drop(t); noise({t:t + .05, type:'bandpass', f:2200, d:.03, v:.05}); tone({t:t + .05, f:620, d:.06, v:.035, type:'triangle'}); },
+    reject(t) { tone({t, f:300, f2:210, d:.14, v:.06, type:'triangle'}); },
+    craft(t) { [523, 659, 784].forEach((f, i) => tone({t:t + i * .07, f, d:.16, v:.07, type:'triangle'})); },
+    discover(t) { // 처음 알아낸 조합: 맑은 종소리 + 반짝임
+      [[784, 0], [1047, .12], [1319, .24], [1568, .36]].forEach(([f, dt]) => { tone({t:t + dt, f, d:1.1, v:.06}); tone({t:t + dt, f:f * 2.01, d:.6, v:.015}); });
+      for (let i = 0; i < 5; i++) tone({t:t + .45 + i * .05, f:2600 + i * 260, d:.12, v:.012, pan:R(-.5, .5)});
+    },
+    ignite(t) { noise({t, a:.05, d:.45, type:'bandpass', f:500, f2:2800, q:.8, v:.12}); tone({t, a:.1, d:.5, f:90, f2:140, v:.06}); for (let i = 0; i < 4; i++) noise({t:t + .15 + i * R(.05, .12), type:'highpass', f:2500, d:.012, v:.05}); },
+    fuel(t) { noise({t, a:.03, d:.3, type:'bandpass', f:700, f2:1600, q:.8, v:.07}); },
+    fizzle(t) { noise({t, a:.01, d:.6, type:'highpass', f:4000, f2:1800, v:.05}); tone({t, f:200, f2:110, d:.25, v:.04}); },
+    eat(t) { for (let i = 0; i < 3; i++) noise({t:t + i * .12, type:'bandpass', f:R(1200, 2000), q:1.5, d:.05, v:.11}); },
+    drink(t) { for (let i = 0; i < 3; i++) tone({t:t + i * .17, f:280, f2:520, a:.01, d:.08, v:.08, lp:1200}); },
+    break(t) { noise({t, type:'highpass', f:2500, d:.06, v:.12}); tone({t, f:900, f2:260, d:.18, v:.06, type:'triangle'}); noise({t:t + .07, type:'bandpass', f:1500, d:.05, v:.07}); },
+    explore_beach(t) { noise({t, a:.12, d:.4, type:'lowpass', f:1400, v:.07}); noise({t:t + .2, type:'bandpass', f:2000, d:.04, v:.03}); },
+    explore_sea(t) { noise({t, a:.08, d:.5, type:'lowpass', f:1800, f2:600, v:.1}); tone({t:t + .05, f:600, f2:300, d:.12, v:.03}); },
+    explore_jungle(t) { noise({t, a:.08, d:.25, type:'bandpass', f:2800, q:.7, v:.08}); noise({t:t + .28, a:.06, d:.22, type:'bandpass', f:3300, q:.7, v:.06}); },
+    explore_ledge(t) { tone({t, f:1200, d:.04, v:.05, type:'square', lp:2500}); tone({t:t + .13, f:900, d:.05, v:.045, type:'square', lp:2500}); noise({t, type:'bandpass', f:1800, d:.05, v:.04}); },
+    splash(t) { noise({t, a:.02, d:.45, type:'lowpass', f:2500, f2:500, v:.12}); for (let i = 0; i < 3; i++) tone({t:t + .05 + i * .06, f:R(700, 1100), f2:300, d:.06, v:.02}); },
+    catch(t) { tone({t, f:659, d:.15, v:.06, type:'triangle'}); tone({t:t + .1, f:988, d:.25, v:.06, type:'triangle'}); },
+    chop(t) { for (let i = 0; i < 2; i++) { tone({t:t + i * .2, f:160, f2:80, d:.12, v:.1}); noise({t:t + i * .2, type:'lowpass', f:1500, d:.06, v:.1}); } },
+    sick(t) { tone({t, f:330, f2:200, a:.05, d:.5, v:.05, type:'triangle'}); tone({t, f:336, f2:190, a:.05, d:.5, v:.04, type:'triangle'}); },
+    hurt(t) { tone({t, f:130, f2:60, d:.22, v:.12}); noise({t, type:'lowpass', f:800, d:.08, v:.08}); },
+    warn(t) { // 상태 위험: 부드러운 심장 박동 두 번 + 낮은 경고음
+      for (let k = 0; k < 2; k++) { tone({t:t + k * .55, f:62, f2:45, d:.16, v:.2}); tone({t:t + k * .55 + .17, f:58, f2:42, d:.14, v:.14}); }
+      tone({t, f:440, f2:415, a:.08, d:.6, v:.025, type:'triangle'});
+    },
+    boar(t) { boarSound(t, sfx, .16, 0, 520); noise({t:t + .5, type:'lowpass', f:600, d:.15, v:.12}); tone({t:t + .5, f:110, f2:55, d:.25, v:.1}); },
+    death(t) {
+      [[440, 0], [349, .45], [262, .9]].forEach(([f, dt]) => tone({t:t + dt, f, a:.05, d:1.4, v:.07, type:'triangle', lp:1800}));
+      tone({t, f:65, a:.6, d:2.6, v:.08});
+    },
+  };
+  function boarSound(t, bus, v, pan, lp) { // 낮은 숨소리 + 꿀꿀
+    if (voices >= MAXV - 1) return;
+    noise({t, a:.25, d:.45, type:'lowpass', f:500, v:v * .5, bus, pan, buf:brown, cap:12});
+    const os = ctx.createOscillator(); os.type = 'sawtooth'; os.frequency.setValueAtTime(85, t + .5); os.frequency.linearRampToValueAtTime(65, t + .95);
+    const am = ctx.createGain(); am.gain.value = .5; const l = ctx.createOscillator(); l.frequency.value = 22; const lg = ctx.createGain(); lg.gain.value = .5; l.connect(lg); lg.connect(am.gain);
+    const fl = ctx.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = lp;
+    const g = ctx.createGain(); env(g, t + .5, .05, v, .45);
+    os.connect(am); am.connect(fl); fl.connect(g); g.connect(dest(bus, pan));
+    os.start(t + .5); l.start(t + .5); os.stop(t + 1.05); l.stop(t + 1.05); track(os, g);
+  }
+
+  /* --- 배경 이벤트 --- */
+  const AMBV = 11; // 배경 이벤트는 상한을 더 낮게
+  const EV = {
+    bird: {w:() => mix.day * (1 - mix.rain * .7), gap:[2.5, 8], fn:() => {
+      const t = now() + .02, base = R(2300, 3600), pan = R(-.7, .7), n = 2 + Math.floor(R(0, 3));
+      for (let i = 0; i < n; i++) tone({t:t + i * R(.09, .14), f:base, f2:base * R(1.15, 1.4), a:.01, d:.07, v:.035 * mix.day, bus:amb, pan, cap:AMBV});
+    }},
+    cricket: {w:() => mix.cricket * (1 - mix.rain * .5), gap:[.35, 1.1], fn:() => {
+      const t = now() + .02, f = R(4300, 4900), pan = R(-.8, .8);
+      for (let i = 0; i < 3; i++) tone({t:t + i * .035, f, a:.004, d:.018, v:.012 * mix.cricket * (mix.fire ? .7 : 1), bus:amb, pan, cap:AMBV});
+    }},
+    twig: {w:() => mix.night * (mix.fire ? .6 : 1), gap:[12, 32], fn:() => {
+      const t = now() + .02, pan = R(-.9, .9), v = .05 * (mix.fire ? .55 : 1);
+      noise({t, type:'bandpass', f:R(2200, 3200), q:2, d:.015, v, bus:amb, pan, cap:AMBV});
+      noise({t:t + R(.06, .12), type:'bandpass', f:R(1800, 2600), q:2, d:.012, v:v * .6, bus:amb, pan, cap:AMBV});
+    }},
+    boar: {w:() => mix.night * (mix.fire ? .35 : 1), gap:[22, 55], fn:() => boarSound(now() + .05, amb, .05 * (mix.fire ? .45 : 1), R(-.8, .8), 300)},
+    crackle: {w:() => mix.fire, gap:[.06, .4], fn:() => {
+      noise({t:now() + .01, type:'highpass', f:R(1500, 3500), d:R(.004, .02), v:R(.015, .04) * mix.fire, bus:amb, pan:R(-.3, .3), cap:AMBV});
+    }},
+    thunder: {w:() => mix.thunder, gap:[14, 36], fn:() => {
+      const t = now() + .05, v = .22 * (mix.storm ? 1 : .7);
+      noise({t, a:.4, d:R(2.5, 4), type:'lowpass', f:R(140, 220), f2:70, q:.5, v, bus:amb, pan:R(-.5, .5), buf:brown, cap:AMBV + 2});
+      noise({t:t + R(.3, .8), a:.2, d:1.5, type:'lowpass', f:300, f2:90, v:v * .5, bus:amb, buf:brown, cap:AMBV + 2});
+    }},
+  };
+  function tick() {
+    if (!live()) return;
+    const t = now();
+    for (const [k, e] of Object.entries(EV)) {
+      const w = e.w();
+      if (w < .05) { nextAt[k] = 0; continue; }
+      if (!nextAt[k]) { nextAt[k] = t + R(e.gap[0], e.gap[1]) / Math.max(w, .25); continue; }
+      if (t >= nextAt[k]) { if (voices < AMBV) e.fn(); nextAt[k] = t + R(e.gap[0], e.gap[1]) / Math.max(w, .25); }
+    }
+  }
+  function startTimer() { if (!timer) timer = setInterval(tick, 150); }
+  function stopTimer() { if (timer) { clearInterval(timer); timer = null; } }
+
+  /* --- 게임 상태 → 배경 믹스 (크로스페이드) --- */
+  function phase(m) {
+    const h = m / 60;
+    if (h >= 6 && h < 17) return [1, 0, 0];
+    if (h >= 17 && h < 18) { const f = h - 17; return [1 - f, Math.sin(Math.PI * f), f]; }
+    if (h >= 18 || h < 5) return [0, 0, 1];
+    const f = h - 5; return [f, Math.sin(Math.PI * f) * .5, 1 - f];
+  }
+  function update(S) {
+    if (!S) return;
+    const m = S.t % 1440, d = Math.floor(S.t / 1440) + 1;
+    const [dy, dk, nt] = phase(m);
+    mix.day = dy; mix.dusk = dk; mix.night = nt;
+    mix.cricket = Math.min(1, nt * .8 + dk * .6);
+    mix.fire = S.stacks.some(st => st.cards.some(c => c.k === 'fire')) ? 1 : 0;
+    mix.rain = S.rain ? 1 : 0;
+    mix.storm = S.storm ? 1 : 0;
+    // 7일차 큰 폭풍 전날 저녁(6·13·20…일차 17시~) 먼 천둥으로 예고. 폭풍 자체는 아직 미구현 (S.storm 이 생기면 비가 커지고 천둥이 잦아짐)
+    mix.thunder = mix.storm ? 1.6 : (d % 7 === 6 && m >= 1020) ? 1 : 0;
+    mix.dead = S.dead ? 1 : 0;
+    // 상태 위험 경고: 위험 구간에 새로 들어갈 때만
+    const dg = {hp:S.hp <= 20, hunger:S.hunger >= 80, thirst:S.thirst >= 80, energy:S.energy <= 20};
+    if (prevDanger && !S.dead && Object.keys(dg).some(k => dg[k] && !prevDanger[k])) q('warn');
+    prevDanger = dg;
+    apply();
+  }
+  function apply() {
+    if (!built) return;
+    const fireMask = mix.fire ? .55 : 1, deadMul = mix.dead ? .35 : 1;
+    const tg = {
+      waves:(.24 * (mix.day + mix.dusk * .5) + .12 * mix.night) * (mix.storm ? 1.4 : 1),
+      leaves:.07 * mix.day * (1 - mix.rain * .6),
+      wind:.32 * mix.night * fireMask + (mix.storm ? .2 : 0),
+      drone:.022 * mix.night * fireMask,
+      fire:.22 * mix.fire,
+      rain:mix.rain ? (mix.storm ? .24 : .11) : 0,
+    };
+    const key = JSON.stringify(tg) + deadMul;
+    if (key === applied) return; applied = key;
+    const t = now();
+    for (const [k, v] of Object.entries(tg)) L[k].g.gain.setTargetAtTime(v * deadMul, t, 1.3);
+  }
+
+  /* --- 효과음 대기열: 한 행동의 결과음을 모아 재생 (처음 알아낸 조합이면 일반 조합음 생략) --- */
+  function q(name) { if (!qset.includes(name)) qset.push(name); }
+  function flushQ() {
+    let list = qset.splice(0);
+    if (list.includes('discover')) list = list.filter(n => n !== 'craft' && n !== 'catch');
+    if (list.includes('death')) list = ['death'];
+    if (!live()) return;
+    list.slice(0, 4).forEach((n, i) => { if (FX[n]) { FX[n](now() + .02 + i * .12); log(n); } });
+  }
+  const played = [];
+  function log(n) { played.push(n); if (played.length > 40) played.shift(); }
+  function play(name) { if (live() && FX[name]) { FX[name](now() + .01); log(name); } }
+
+  /* --- 설정 --- */
+  function setOn(v) {
+    set.on = v; save();
+    if (v) { ensure(); if (master) master.gain.setTargetAtTime(1, now(), .05); }
+    else if (ctx) { master.gain.setTargetAtTime(0, now(), .05); stopTimer(); setTimeout(() => { if (!set.on) ctx.suspend().catch(() => {}); }, 200); }
+  }
+  function setVol(which, v) {
+    set[which] = v; save();
+    if (built) (which === 'bgm' ? amb : sfx).gain.setTargetAtTime(which === 'bgm' ? v : v * SFXB, now(), .05);
+  }
+  function onVisibility() {
+    if (!ctx) return;
+    if (document.hidden) { stopTimer(); ctx.suspend().catch(() => {}); }
+    else if (set.on) { ctx.resume().catch(() => {}); startTimer(); }
+  }
+  ['pointerdown', 'touchend', 'click', 'keydown'].forEach(ev => document.addEventListener(ev, ensure, {capture:true, passive:true}));
+  document.addEventListener('visibilitychange', onVisibility);
+  window.addEventListener('pagehide', () => { if (ctx) ctx.suspend().catch(() => {}); });
+  return {
+    play, q, flushQ, update, setOn, setVol, ensure, settings:set, played, FXNAMES:Object.keys(FX),
+    get ctx() { return ctx; }, get voices() { return voices; }, get built() { return built; }, get master() { return master; }, get mix() { return mix; }, layers:L,
+  };
+})();
+function syncSndBtn() { const b = $('#bSnd'); if (b) b.textContent = SND.settings.on ? '🔊' : '🔇'; }
+
 /* ---------- 시작 ---------- */
 function boot() {
   measure();
+  syncSndBtn();
   let run = null;
   try { run = JSON.parse(localStorage.getItem(RUN_KEY) || 'null'); } catch (e) {}
   if (run && run.v === VERSION) {
@@ -1079,7 +1391,7 @@ function boot() {
   if (!meta.seenHelp) showHelp();
 }
 function sortBoardIfOff() { if (S.stacks.some(st => st.x + D.cw > D.W + 2)) sortBoard(true); }
-window.__game = {get S() { return S; }, get meta() { return meta; }, sortBoard, render, D, K, advance:(m) => { advance(m); after(); }};
+window.__game = {snd:SND, get S() { return S; }, get meta() { return meta; }, sortBoard, render, D, K, advance:(m) => { advance(m); after(); }};
 boot();
 </script>
 </body>
