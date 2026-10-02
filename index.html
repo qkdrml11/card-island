@@ -117,6 +117,27 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
 .trait.hid{opacity:.55}
 .big{font-size:40px;text-align:center}
 .muted{color:#7a6a48;font-size:13px}
+.c-crew{background:#e7e2ff;border-color:#5a4bb0}
+.c-crew .ft{font-size:calc(var(--cw)*.13)}
+.c-story{background:#f3ead6;border-color:#8a6d3b;border-style:dashed}
+.ci.tired{background:#ddd6f3;border-style:dashed}
+.ci.hungry .ft{color:#c0392b;font-weight:700}
+#sheet .endtxt p,#sheet p.endtxt{font-size:15px;line-height:1.7;margin:6px 0}
+#sheet .rcp .e.dim{filter:grayscale(1) opacity(.6)}
+#sheet .tabs{display:flex;gap:6px;margin:0 0 8px}
+#sheet .tabs button{flex:1;min-height:40px}
+#sheet .tabs button.on{background:#ffd36b;outline:2px solid #d9a400}
+.ship{display:flex;gap:8px;margin:6px 0 4px}
+.ship button{flex:1;text-align:left;padding:8px 10px!important;line-height:1.35;min-height:auto!important}
+.ship button.on{background:#ffe6a0!important;outline:3px solid #d9a400}
+.ship button b{font-size:16px}
+.ship button small{display:block;font-weight:600;font-size:12px;color:#5b4a26;margin-top:3px}
+#intro{position:fixed;inset:0;background:#000;color:#e9e4d6;z-index:500000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
+#intro[hidden]{display:none}
+#intro .ln{font-size:19px;line-height:1.7;margin:4px 0;opacity:0;transform:translateY(6px);transition:opacity 1.1s,transform 1.1s;font-weight:600;letter-spacing:-.2px}
+#intro .ln.on{opacity:1;transform:none}
+#intro .hint{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 34px);font-size:13px;opacity:0;transition:opacity 1s;color:#9a9484}
+#intro .hint.on{opacity:1}
 </style>
 </head>
 <body>
@@ -136,6 +157,7 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
 </div>
 <div id="toasts"></div>
 <div id="overlay" hidden><div id="sheet"></div></div>
+<div id="intro" hidden><div class="ln">폭풍이 지나간 아침. 파도가 나를 모래 위에 내려놓았다.</div><div class="ln">배도, 선원들도 보이지 않는다.</div><div class="ln">일곱 명. 한 명씩 찾는다.</div><div class="hint">탭하면 해변으로</div></div>
 <script>
 'use strict';
 /* ====== 카드 무인도 프로토타입 (기획서 v0.3 기준, 수치는 임시값) ====== */
@@ -190,11 +212,11 @@ const FAC = {
   hut:{max:40, storm:1, fix:{log:10, leaf:4}},
   catcher:{max:10, storm:1, fix:{leaf:5, stick:5}},
 };
-const fdOf = c => c.fd === undefined ? FAC[c.k].max : c.fd;
+const fdOf = c => c.fd === undefined ? fmax(c.k) : c.fd;
 const fixList = k => Object.entries(FAC[k].fix).map(([m, v]) => `${K[m].e}${K[m].n} +${v}`).join(', ');
 const FIXED = new Set(['beach','sea','flat','jungle','ledge','base','valley','cave','fire','firex','bed','catcher','windbreak','fence','hut','compost']);
 // 버리기(🌊 얕은 바다): 도구·장소·시설·불은 못 버림 / 퇴비 더미에 넣을 수 있는 것
-const canDiscard = c => !FIXED.has(c.k) && !['tool','place','fac'].includes(K[c.k].cat);
+const canDiscard = c => !FIXED.has(c.k) && !['tool','place','fac','crew'].includes(K[c.k].cat);
 const COMPOSTABLE = new Set(['rotten','bone','weed']);
 const COMPOST_MAX = 3, COMPOST_MIN = 1440;
 const PLACE_ORDER = ['beach','sea','flat','jungle','ledge','base'];
@@ -269,7 +291,7 @@ const TRAITS = [
 function dropTable(k) {
   if (k === 'beach') return [['stone',25,'shore'],['stick',25,'shore'],['clam',20,'shore'],['crab',8,'shore'],['plank',4,'shore']];
   if (k === 'sea') return [['weed',30,'weed']];
-  if (k === 'flat') return [['clam',40,'all'],['crab',25,'all'],['bigclam',15,'all']];
+  if (k === 'flat') return [['clam',40,'all'],['crab',25,'all'],['bigclam',L_('dal') && S.ship === 'fish' ? 25 : 15,'all']];
   if (k === 'jungle') return [['leaf',25,'veg'],['fiber',25,'veg'],['stick',20,'veg'],['coco',12,'coco'],['vine',8,'veg'],['bent',5,'veg']];
   if (k === 'ledge') return S.rain ? [['stone',30,'rock'],['flint',25,'rock'],['egg',10,'egg'],['rainw',25,'rainw']]
                                    : [['stone',30,'rock'],['flint',25,'rock'],['egg',10,'egg'],['rainw',10,'rainw']];
@@ -295,10 +317,10 @@ let pending = [];
 function loadMeta() {
   let m = null;
   try { m = JSON.parse(localStorage.getItem(META_KEY) || 'null'); } catch (e) {}
-  return Object.assign({points:0, discovered:{}, appeared:{stone:1}, unlocked:{}, bestDays:0, places:{}, lives:0, lastTraits:[], seenHelp:0}, m || {});
+  return Object.assign({points:0, discovered:{}, appeared:{stone:1}, unlocked:{}, bestDays:0, places:{}, lives:0, lastTraits:[], seenHelp:0, roster:{}, endings:{}, endMethod:{}, pieces:{}, storyLives:0, lastShip:'fish'}, m || {});
 }
 function saveMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch (e) {} }
-function saveRun() { try { localStorage.setItem(RUN_KEY, JSON.stringify(S)); } catch (e) {} }
+function saveRun() { if (S && S.pre) return; try { localStorage.setItem(RUN_KEY, JSON.stringify(S)); } catch (e) {} }
 
 const day = (t = S.t) => Math.floor(t / 1440) + 1;
 const mod = (t = S.t) => t % 1440;
@@ -317,21 +339,25 @@ function mk(k) {
   if (k === 'catcher') c.water = 0;
   if (k === 'ember') c.exp = S.t + 30;
   if (k === 'compost') c.items = [];
-  if (FAC[k]) c.fd = FAC[k].max;
+  if (FAC[k]) c.fd = fmax(k);
   return c;
 }
-function maxDur(c) { return K[c.k].dur + (c.k === 'drill' && hasTrait('firehand') ? 3 : 0); }
+function maxDur(c) { return c.mx || K[c.k].dur + (c.k === 'drill' && hasTrait('firehand') ? 3 : 0); }
 
-function newGame(traits, naked) {
+function newGame(traits, naked, ship, pre) {
   S = {v:VERSION, st100:1, t:420, hp:100, energy:100, hunger:80, thirst:80, temp:36.5, sick:0, injured:0, rain:false, rainStreak:0, storm:0, stormStart:0, stormEnd:0,
        stacks:[], places:initPools(), nid:1, dead:false, scored:false, lastCause:'',
-       life:{traits:traits || [], naked:!!naked, surv:0, storms:0, newRecipes:[], newPlaces:[]}, log:[], flags:{}};
+       life:{traits:traits || [], naked:!!naked, surv:0, storms:0, newRecipes:[], newPlaces:[]}, log:[], flags:{},
+       ship:ship || null, crew:ship ? {alive:pickCrew(), st:{}} : null, learned:{}, lc:{}, flatN:0, ships:0, rescueReady:0, calmDay:0, crewGain:{}, canStay:!!ship && homeAll()};
+  if (pre) S.pre = 1;
+  applyShipRecipes();
+  if (ship === 'fish') S.places.sea.pools.fish = [16, 16];
   for (const k of PLACE_ORDER) addStack([mk(k)], 0, 0);
   addStack([mk('coco')], 0, 0);
   if (hasTrait('stone')) addStack([mk('sharp')], 0, 0);
   if (hasTrait('map')) for (const k of ['beach','sea','jungle','ledge']) S.places[k].exp = 30;
   sortBoard(true);
-  logMsg('1일차 07:00, 해변에서 눈을 떴다.');
+  logMsg(ship ? `1일차 07:00, 폭풍이 지나간 아침. 바다제비호(${SHIPS[ship].n})의 선장으로 해변에서 눈을 떴다.` : '1일차 07:00, 해변에서 눈을 떴다.');
   saveRun();
 }
 function addStack(cards, x, y) { const st = {id:'s' + (S.nid++), x, y, cards}; S.stacks.push(st); return st; }
@@ -382,6 +408,8 @@ function startStorm(type, end) {
   say(`⛈️ ${type === 'big' ? '큰 폭풍' : '폭풍'}이 몰아친다! (${whenStr(end)}까지)${hasHut() ? ' 오두막 안은 안전하다.' : ' 오두막이 없으면 체력이 깎이고 몸이 식는다. 시설 내구도가 줄어드니 재료를 올려 보수하자.'}`, 'bad');
 }
 function endStorm() {
+  if (S.storm === 'big') S.calmDay = day();
+  if (S.crew) learn('hal');
   S.storm = 0; S.life.storms = (S.life.storms || 0) + 1;
   say('🌤️ 폭풍이 지나갔다. 버텼다! (폭풍 버티기 +3 각인)', 'good');
   appear('stormsense');
@@ -405,7 +433,7 @@ function facWear() {
   for (const c of list) {
     const Fc = FAC[c.k]; c.fd = fdOf(c) - Fc.storm * mul / 60;
     if (c.fd <= 1e-6) br.push(c);
-    else if (!c.fdw && c.fd <= Fc.max * .3) { c.fdw = 1; say(`⚠️ ${K[c.k].e} ${K[c.k].n}이(가) 곧 부서진다! (내구 ${Math.ceil(c.fd)}/${Fc.max}) 보수: ${fixList(c.k)}`, 'bad'); }
+    else if (!c.fdw && c.fd <= fmax(c.k) * .3) { c.fdw = 1; say(`⚠️ ${K[c.k].e} ${K[c.k].n}이(가) 곧 부서진다! (내구 ${Math.ceil(c.fd)}/${fmax(c.k)}) 보수: ${fixList(c.k)}`, 'bad'); }
   }
   if (br.length) breakFac(br, '폭풍에');
 }
@@ -466,7 +494,7 @@ function heatUp(v, why) { const b0 = tband(); S.temp = clamp(S.temp + v, 28, 43)
 function coolDrink() { if (S.temp > TEMP_N) { const b0 = tband(); S.temp = Math.max(TEMP_N, S.temp - .3); tempMsg(b0); return ' 열 −0.3℃'; } return ''; }
 function advance(min, mode = 'awake') {
   const rest = mode === 'rest';
-  for (let i = 0; i < min && !S.dead; i++) {
+  for (let i = 0; i < min && !S.dead && !S.pendingEnd; i++) {
     S.t++;
     const m = mod();
     const sleepy = rest && !S.storm; // 폭풍 중에는 잠을 못 자서 깨어 있을 때 속도
@@ -502,6 +530,7 @@ function advance(min, mode = 'awake') {
     if (m === 1080) regenShore();
     if (m === 0) nightBeast();
     if (isWet() && m % 60 === 0) rainHour(m);
+    if (S.crew && m % 60 === 0) crewHour(m);
   }
 }
 function tickCards() {
@@ -510,9 +539,13 @@ function tickCards() {
     if (c.k === 'fire') {
       c.fuel--;
       if (c.cook && S.t >= c.cook.until) {
-        const out = K[c.cook.k].cook; const nc = mk(out);
+        const out = K[c.cook.k].cook;
+        if (c.cook.crew) { give(out, st); c.cook = null; discover('cook_' + out); }
+        else {
+        const nc = mk(out);
         spawnNear(nc, st); c.cook = null; discover('cook_' + out); SND.q('catch');
         say(`${K[out].e} ${K[out].n} 완성!`, 'good');
+        }
       }
       if (c.fuel <= 0) extinguish(c, st, '연료가 다 타서');
     } else if (c.k === 'compost') {
@@ -533,11 +566,11 @@ function dawn() {
   S.life.surv++;
   regenShore();
   for (const [pk, pools] of Object.entries(REGEN)) for (const [rk, v] of Object.entries(pools)) {
-    const p = S.places[pk].pools[rk]; p[0] = Math.min(p[1], p[0] + v);
+    const p = S.places[pk].pools[rk]; p[0] = Math.min(p[1], p[0] + (pk === 'sea' && rk === 'fish' && S.ship === 'fish' ? 8 : v));
   }
   const d = day();
   const p = Math.min(.40, .20 + .01 * (d - 1));
-  S.rain = rnd() < p;
+  S.rain = S.nextRain !== undefined ? S.nextRain : rnd() < p; delete S.nextRain;
   S.rainStreak = S.rain ? S.rainStreak + 1 : 0;
   if (!S.rain) { const r = S.places.ledge.pools.rainw; r[0] = Math.max(0, r[0] - 1); }
   say(`🌅 ${d}일차 아침. 살아남았다 (생존 ${S.life.surv}일)${S.rain ? ` — 🌧️ 비가 온다${S.rainStreak > 1 ? ` (${S.rainStreak}일째)` : ''}` : ''}`, 'good');
@@ -547,7 +580,7 @@ function dawn() {
 }
 function rainHour(m) {
   for (const st of S.stacks) for (const c of st.cards) {
-    if (c.k === 'fire' && rnd() < .25) extinguish(c, st, '비에 젖어서');
+    if (c.k === 'fire' && rnd() < (S.crew && mates().some(x => x.job === 'fire' && x.h > 20 && x.w > 20) ? .05 : .25)) extinguish(c, st, '비에 젖어서');
     if (m % 120 === 0 && c.k === 'catcher' && c.water < 3 && !S.storm) c.water++;
   }
   if (m % 120 === 0) { const r = S.places.ledge.pools.rainw; r[0] = Math.min(r[1], r[0] + 1); }
@@ -563,7 +596,7 @@ function nightBeast() {
     if (wall) {
       wall.fd = fdOf(wall) - 4; SND.q('boar');
       if (wall.fd <= 1e-6) breakFac([wall], '멧돼지에');
-      else say(`🐗 멧돼지가 ${K[wall.k].n}을(를) 들이받고 돌아갔다. 내구 −4 (${Math.ceil(wall.fd)}/${FAC[wall.k].max})`, 'bad');
+      else say(`🐗 멧돼지가 ${K[wall.k].n}을(를) 들이받고 돌아갔다. 내구 −4 (${Math.ceil(wall.fd)}/${fmax(wall.k)})`, 'bad');
       return;
     }
     const n = Math.min(foods.length, rnd() < .5 ? 1 : 2);
@@ -590,6 +623,8 @@ function act(min, e, fn, mode) {
 }
 function after() {
   checkPlaces();
+  if (S.crew) crewGainFlush();
+  if (S.pendingEnd && !S.dead) { const pe = S.pendingEnd; delete S.pendingEnd; if (pe.type === 'rescue') { saveRun(); render(); flush(); return endingFlow('rescue', mates().map(m => cOf(m).id)); } }
   if (S.dead) die();
   saveRun(); render(); flush();
   if (S.dead) setTimeout(showDeath, 450);
@@ -646,9 +681,11 @@ function explore(card) {
     if (night) appear('nighteye');
     const P = S.places[k];
     if (k !== 'flat') { // 갯벌은 탐사도 없음
-      const before = P.exp; P.exp = Math.min(100, P.exp + 5);
-      if (before < 100 && P.exp >= 100) { say(`🗺️ ${K[k].n} 탐사 100%!`, 'good'); appear('map'); }
+      const before = P.exp; P.exp = Math.min(100, P.exp + (L_('yun') ? 6 : 5));
+      if (before < 100 && P.exp >= 100) { say(`🗺️ ${K[k].n} 탐사 100%!`, 'good'); appear('map'); learn('yun'); }
     }
+    if (k === 'flat') S.flatN = (S.flatN || 0) + 1;
+    if (S.crew) { learn('kong'); if (k === 'flat' && S.ship === 'fish') learn('dal'); }
     if (S.storm) { dmg(10, '폭풍'); SND.q('hurt'); say('⛈️ 폭풍 속에서는 아무것도 찾지 못했다. 체력 −10', 'bad'); return; }
     if (!S.rain && !night && S.thirst <= 20) heatUp(.3, '🥵 목이 탄 채 뙤약볕 아래를 돌아다녔다. 체온 +0.3℃');
     // 결과 굴리기
@@ -657,8 +694,10 @@ function explore(card) {
       if (roll < pr) { const p = P.pools[pool]; if (p[0] > 0) { p[0]--; got = rk; } break; }
       roll -= pr;
     }
+    if (!got && L_('kong') && rnd() < .03) { const rare = dropTable(k).slice(k === 'flat' ? 2 : 3).filter(([, , pool]) => P.pools[pool][0] > 0); if (rare.length) { const [rk, , pool] = rare[Math.floor(rnd() * rare.length)]; P.pools[pool][0]--; got = rk; } }
     if (got) { spawnNear(mk(got), st); say(`${K[k].e} 살피기 → ${K[got].e} ${K[got].n}`); }
     else say(`${K[k].e} 살피기 → 빈손`);
+    storySpawn(k, st);
     if (S.flags.bait && (k === 'sea' || k === 'beach')) { delete S.flags.bait; spawnNear(mk('crab'), st); SND.q('catch'); say('🦀 버린 찌꺼기 냄새를 맡고 게가 몰려왔다! +게', 'good'); }
     // 위험
     const nr = hasTrait('nighteye') ? .5 : 1;
@@ -688,9 +727,10 @@ function eat(card) {
   removeCards([card]);
   act(5, 0, () => {
     SND.q(d.cat === 'water' ? 'drink' : 'eat');
-    if (d.eat.h) S.hunger = clamp(S.hunger + d.eat.h);
+    const hh = (d.eat.h || 0) + (L_('sot') && COOKED.has(card.k) ? 5 : 0);
+    if (hh) S.hunger = clamp(S.hunger + hh);
     if (d.eat.t) S.thirst = clamp(S.thirst + d.eat.t);
-    say(`${d.e} ${d.n}을(를) ${verb}.${d.eat.h ? ' 포만감 +' + d.eat.h : ''}${d.eat.t ? ' 수분 +' + d.eat.t : ''}${d.cat === 'water' ? coolDrink() : ''}`);
+    say(`${d.e} ${d.n}을(를) ${verb}.${hh ? ' 포만감 +' + hh : ''}${d.eat.t ? ' 수분 +' + d.eat.t : ''}${d.cat === 'water' ? coolDrink() : ''}`);
     if (d.eat.sick) { const p = d.eat.sick * (hasTrait('stomach') ? .5 : 1); if (rnd() < p) getSick(); }
   });
 }
@@ -751,27 +791,27 @@ function partialRecipe(cs) { const c = counts(cs); return RECIPES.some(r => subC
 function fixedInteraction(a, b, bst) {
   const ak = a.k, bk = b.k;
   if (FAC[bk]) { // 〔v0.5 확정: 시설 내구도·보수〕 재료를 올려 보수
-    const Fb = FAC[bk], mat = ak === 'vine' ? 'rope' : ak, add = Fb.fix[mat];
-    if (add && fdOf(b) < Fb.max - 1e-6) {
-      const storm = !!S.storm, t = storm ? 40 : 20;
+    const Fb = FAC[bk], mat = ak === 'vine' ? 'rope' : ak, add = Fb.fix[mat] && Fb.fix[mat] * (L_('nul') && S.ship === 'cargo' ? 1.5 : 1), Fmax = fmax(bk);
+    if (add && fdOf(b) < Fmax - 1e-6) {
+      const storm = !!S.storm, t = (storm ? 40 : 20) * (L_('dal') && S.ship === 'cargo' ? .5 : 1);
       return {e:1, run:() => {
         removeCards([a]); S.repairing = 1;
         try {
           act(t, 1, () => {
             if (!allCards().includes(b)) return say(`💥 보수하는 사이 ${K[bk].n}이(가) 부서졌다…`, 'bad');
-            b.fd = Math.min(Fb.max, fdOf(b) + add); if (b.fd > Fb.max * .3) delete b.fdw;
+            b.fd = Math.min(Fmax, fdOf(b) + add); if (b.fd > Fmax * .3) delete b.fdw; if (S.ship === 'cargo') learn('dal');
             SND.q(mat === 'leaf' ? 'explore_jungle' : 'chop');
-            say(`🔨 ${K[bk].e} ${K[bk].n} 보수 +${add} → 내구 ${Math.ceil(b.fd - 1e-6)}/${Fb.max} (${t}분)${storm ? ' · 폭풍 속 작업이라 몸이 더 식었다' : ''}`, 'good');
+            say(`🔨 ${K[bk].e} ${K[bk].n} 보수 +${add} → 내구 ${Math.ceil(b.fd - 1e-6)}/${Fmax} (${t}분)${storm ? ' · 폭풍 속 작업이라 몸이 더 식었다' : ''}`, 'good');
           });
         } finally { S.repairing = 0; }
       }};
     }
-    if (add && !RECIPES.some(r => r.up === bk && r.inp[mat])) return {msg:`${K[bk].e} ${K[bk].n}은(는) 아직 튼튼해요 (내구 ${Fb.max}/${Fb.max}).`};
+    if (add && !RECIPES.some(r => r.up === bk && r.inp[mat])) return {msg:`${K[bk].e} ${K[bk].n}은(는) 아직 튼튼해요 (내구 ${Fmax}/${Fmax}).`};
   }
   if (bk === 'fire') {
     if (K[ak].cook) {
       if (b.cook) return {msg:'🔥 이미 굽는 중이에요 (모닥불 조리 1개).'};
-      return {run:() => { removeCards([a]); b.cook = {k:ak, until:S.t + 20}; SND.q('stack'); say(`${K[ak].e} ${K[ak].n}을(를) 불에 올렸다. 20분 뒤 익음 (다른 행동·쉬기로 시간이 흘러야 함)`); after(); }};
+      return {run:() => { removeCards([a]); b.cook = {k:ak, until:S.t + 20}; SND.q('stack'); learn('sot'); say(`${K[ak].e} ${K[ak].n}을(를) 불에 올렸다. 20분 뒤 익음 (다른 행동·쉬기로 시간이 흘러야 함)`); after(); }};
     }
     if (ak === 'stick' || ak === 'plank' || ak === 'log') {
       return {run:() => { const add = ak === 'log' ? 360 : 120; removeCards([a]); b.fuel = Math.min(720, b.fuel + add); discover('fuel'); SND.q('fuel'); say(`🔥 연료 +${add / 60}시간 (남은 연료 ${fmtH(b.fuel)})`); after(); }};
@@ -786,19 +826,21 @@ function fixedInteraction(a, b, bst) {
     if (ak === 'ember') return {e:1, run:() => { removeCards([a]); act(10, 1, () => { b.k = 'fire'; b.fuel = 180; discover('relightfire'); SND.q('ignite'); say('🔥 모닥불을 다시 피웠다 (연료 3시간).', 'good'); }); }};
     return null;
   }
+  if (bk === 'signal' && (ak === 'ember' || (ak === 'torch' && a.dur > 0))) return lightSignal(a, b);
+  if (bk === 'sea' && (ak === 'raft' || ak === 'bigraft')) return tryDepart(a);
   if (bk === 'jungle' && (ak === 'sharp' || ak === 'knife')) {
-    const t = ak === 'sharp' ? 60 : 40, e = ak === 'sharp' ? 8 : 6;
+    const t = ak === 'sharp' ? 60 : 40, e = (ak === 'sharp' ? 8 : 6) * (L_('gom') ? .5 : 1);
     return {e, run:() => act(t, e, () => {
       const p = S.places.jungle.pools.log;
       wear(a);
       if (p[0] <= 0) return say('🌴 벨 만한 나무가 없다 (통나무 고갈).', 'bad');
-      p[0]--; SND.q('chop'); spawnNear(mk('log'), bst); discover('chop'); say(`🪵 통나무를 베었다 (${t}분).`);
+      p[0]--; SND.q('chop'); spawnNear(mk('log'), bst); discover('chop'); learn('gom'); say(`🪵 통나무를 베었다 (${t}분).`);
     })};
   }
   if (bk === 'sea' && (ak === 'spear' || ak === 'rod')) {
     if (S.storm) return {msg:'⛈️ 폭풍 중에는 낚시를 할 수 없어요.'};
     const sp = ak === 'spear';
-    const t = sp ? 30 : 60, e = (sp ? 10 : 4) * (hasTrait('seaman') ? .7 : 1), ch = sp ? .6 : .7;
+    const t = sp ? 30 : 60, e = (sp ? 10 : 4) * (hasTrait('seaman') ? .7 : 1), ch = (sp ? .6 : .7) + (S.ship === 'fish' ? .1 : 0);
     return {e, run:() => act(t, e, () => {
       wear(a);
       const p = S.places.sea.pools.fish;
@@ -824,7 +866,7 @@ function toolPair(tool, item, ist) {
       if (rnd() < p) { SND.q('ignite'); removeCards([item]); spawnAt(mk('ember'), ist); discover('ember'); appear('firehand'); say('✨ 불씨가 일었다! 30분 안에 써야 해요.', 'good'); }
       else { SND.q('fizzle'); say('🌀 불씨 실패… (손드릴 내구 −1, 섬유는 남음)', 'bad'); }
     })};
-  if (tk === 'knife' && (ik === 'fish' || ik === 'crab'))
+  if ((tk === 'knife' && (ik === 'fish' || ik === 'crab')) || (tk === 'sharp' && ik === 'fish' && S.ship === 'fish'))
     return {e:0, run:() => { removeCards([item]); act(10, 0, () => {
       wear(tool); SND.q('chop');
       if (ik === 'fish') { const n = mk('fishk'); n.sp = item.sp; spawnAt(n, ist); spawnNear(mk('bone'), ist); discover('cleanfish'); say('🔪 생선을 손질했다. 생선뼈 1'); }
@@ -852,6 +894,8 @@ function handleDrop(drag, target, pos) {
   if (target === src) { SND.play('drop'); return render(); }
   const T = target, tRoot = T.cards[0], tTop = T.cards[T.cards.length - 1];
   const a = moving[moving.length - 1];
+  if (moving.length === 1 && crewDrop(a, T)) return;
+  if (T.cards.some(c => isMate(c) || isTired(c))) { toast('선원 위에는 물·음식만 올릴 수 있어요.'); SND.play('reject'); return render(); }
   // 0) 기지 위 = 시설 짓기 / 얕은 바다 위 = 버리기 / 퇴비 더미 위 = 넣기
   if (T.cards.length === 1 && tRoot.k === 'base') return baseDrop(moving, src, drag.idx, T);
   if (T.cards.length === 1 && tRoot.k === 'sea' && a.k !== 'spear' && a.k !== 'rod' && moving.every(canDiscard)) return discard(moving, src, drag.idx);
@@ -924,7 +968,7 @@ function baseDrop(moving, src, idx, baseSt) {
     const miss = Object.entries(x.inp).map(([k, n]) => [k, n - (c[k] || 0)]).filter(([, n]) => n > 0);
     return `${K[x.out].e} ${K[x.out].n}: ${miss.map(([k, n]) => K[k].n + (n > 1 ? ' ×' + n : '')).join(', ')} 더 필요`;
   });
-  toast(near.length ? '🏕️ ' + near.slice(0, 2).join(' / ') : '🏕️ 기지에는 시설 재료 더미를 올려요 (침상·빗물 받이·울타리·퇴비 더미). 쉬기는 기지를 탭.');
+  toast(near.length ? '🏕️ ' + near.slice(0, 2).join(' / ') : '🏕️ 기지에는 시설 재료 더미를 올려요 (침상·빗물 받이·울타리·퇴비 더미·신호대·뗏목). 쉬기는 기지를 탭.');
   SND.play('reject'); render();
 }
 // 🌊 얕은 바다에 버리기 (0분). 상한 음식·생선뼈는 15%로 다음 해변/얕은 바다 살피기에 게 +1
@@ -955,12 +999,15 @@ function craft(r, T, moving) {
   const pos = {x:T.x, y:T.y};
   removeCards(T.cards.concat(moving));
   if (T.pileSrc && S.stacks.includes(T.pileSrc)) { const p = findFree(T.x, T.y + D.cellH); pos.x = p.x; pos.y = p.y; }
-  act(r.t, r.e, () => {
+  const rt = recipeTime(r);
+  act(rt, r.e, () => {
     const c = mk(r.out);
+    if (L_('nul') && S.ship === 'fish' && (r.out === 'spear' || r.out === 'rod')) { c.dur += 4; c.mx = c.dur; }
+    if (['rope','spear','rod'].includes(r.id)) learn('nul');
     if (!overlapsAny({x:pos.x, y:pos.y, w:D.cw, h:D.ch})) addStack([c], pos.x, pos.y); else spawnNear(c, {x:pos.x, y:pos.y, cards:[]});
     discover(r.id);
     SND.q(r.out === 'fire' || r.out === 'torch' ? 'ignite' : 'craft');
-    say(`${K[r.out].e} ${K[r.out].n} 완성 (${r.t}분)`);
+    say(`${K[r.out].e} ${K[r.out].n} 완성 (${rt}분)`);
   });
 }
 
@@ -1032,7 +1079,16 @@ const fmtH = m => `${Math.floor(m / 60)}:${pad(Math.max(0, Math.round(m % 60)))}
 function cardInner(c, st, i) {
   const d = K[c.k]; const n = st.cards.length; const top = i === n - 1; const pile = isPile(st);
   let cls = 'ci c-' + d.cat, ft = '', bar = -1, extra = '';
-  if (d.cat === 'place') {
+  if (d.cat === 'crew') {
+    if (isTired(c)) { cls += ' tired'; ft = '지침<br>물·음식 주기'; }
+    else {
+      const nt = isNight(), lab = S.storm ? '⛈️ 기지' : (c.h <= 20 || c.w <= 20) ? '😩 허기' : (nt && c.job !== 'fire') ? '🌙 잠' : (JOBNM[c.job] || '').split(' ')[0] + ' 일';
+      ft = `${lab}<br>🍖${Math.round(c.h)} 💧${Math.round(c.w)}`; bar = Math.min(c.h, c.w); if (c.h <= 20 || c.w <= 20) cls += ' hungry';
+    }
+  } else if (d.cat === 'story') ft = isTrace(c) ? `${K[cOf(c).at].e}에<br>올리기` : '탭: 읽기';
+  else if (c.k === 'signal') ft = `배 ${S.ships || 0}/3<br>${S.rescueReady ? '🟡 연기' : '횃불 올리기'}`;
+  else if (c.k === 'raft' || c.k === 'bigraft') ft = `🌊에 올려 출항<br>선장+${c.k === 'raft' ? 2 : 4}`;
+  else if (d.cat === 'place') {
     if (d.locked) { cls += ' locked'; ft = '준비 중'; }
     else if (c.k === 'base') { const rr = restRate(); ft = `탭: 쉬기<br>${rr.nm}`; }
     else if (c.k === 'flat') {
@@ -1044,7 +1100,8 @@ function cardInner(c, st, i) {
       const P = S.places[c.k]; let cur = 0, mx = 0;
       for (const [pk, p] of Object.entries(P.pools)) if (pk !== 'fish' && pk !== 'log') { cur += p[0]; mx += p[1]; }
       const lv = cur / mx > .6 ? '많음' : cur / mx > .2 ? '조금' : '없음';
-      ft = `탐사 ${P.exp}%<br>${canExplore(c.k) ? '자원 ' + lv : '🌙 횃불 필요'}`; bar = P.exp;
+      const wk = S.crew ? mates().filter(m => m.job === c.k).length : 0;
+      ft = `탐사 ${P.exp}%${wk ? ' 👤' + (wk > 1 ? wk : '') : ''}<br>${canExplore(c.k) ? '자원 ' + lv : '🌙 횃불 필요'}`; bar = P.exp;
       if (!canExplore(c.k)) cls += ' locked';
     }
   } else if (d.dur) { ft = `내구 ${c.dur}/${maxDur(c)}`; bar = c.dur / maxDur(c) * 100; }
@@ -1057,7 +1114,7 @@ function cardInner(c, st, i) {
   else if (c.k === 'hut') ft = '폭풍 차단<br>쉬기 +12';
   else if (c.k === 'fence') ft = '밤짐승<br>차단';
   else if (c.k === 'bigclam') ft = '조개 그릇<br>재료(다음)';
-  if (FAC[c.k]) { const Fc = FAC[c.k], v = fdOf(c); ft = (c.k === 'hut' ? '쉬기 +12' : c.k === 'fence' ? '밤짐승 차단' : ft) + `<br>내구 ${Math.ceil(v - 1e-6)}/${Fc.max}`; bar = v / Fc.max * 100; if (v <= Fc.max * .3) cls += ' frail'; }
+  if (FAC[c.k]) { const Fm = fmax(c.k), v = fdOf(c); ft = (c.k === 'hut' ? '쉬기 +12' : c.k === 'fence' ? '밤짐승 차단' : ft) + `<br>내구 ${Math.ceil(v - 1e-6)}/${Fm}`; bar = v / Fm * 100; if (v <= Fm * .3) cls += ' frail'; }
   else if (c.k === 'compost') { const it = c.items || []; ft = it.length ? `썩는 중 ${it.length}/${COMPOST_MAX}<br>${Math.max(0, Math.ceil((Math.min(...it.map(x => x.until)) - S.t) / 60))}시간 뒤` : '상한 음식<br>넣기'; if (it.length) bar = (1 - (Math.min(...it.map(x => x.until)) - S.t) / COMPOST_MIN) * 100; }
   else if (c.k === 'humus') ft = '농사용<br>(다음 빌드)';
   else if (c.k === 'rotten') ft = '먹으면 배탈<br>🌊에 버리기';
@@ -1221,6 +1278,8 @@ function onTap(card) {
   if (S.dead) return;
   const d = K[card.k];
   if (d.cat === 'place') return explore(card);
+  if ((d.cat === 'crew' || d.cat === 'story') && storyTap(card)) return;
+  if (d.cat === 'crew' || d.cat === 'story') return;
   if (card.k === 'catcher') return drinkCatcher(card);
   if (card.k === 'rotten') return confirmRotten(card);
   if (d.eat || d.closed || d.noRaw) return eat(card);
@@ -1232,9 +1291,10 @@ function onTap(card) {
     fire:'켜져 있으면 몸이 데워져요 (+0.3℃/시간). 재료를 올리면 굽기, 나뭇가지·통나무는 연료, 꺼진 횃불은 다시 붙이기', firex:'✨ 불씨를 올리면 다시 피울 수 있어요',
     bed:'쉬기는 🏕️ 기지를 탭', windbreak:'비를 막아 몸이 식지 않아요 (폭풍 피해 −3/시간으로 줄임). 폭풍에 내구가 닳으니 보수하세요. 쉬기는 🏕️ 기지를 탭', ember:'나뭇가지에 올리면 모닥불, 30분 안에 쓰세요',
     torchx:'🔥 모닥불에 올리면 다시 붙어요', sharp:'코코넛·정글에 올리거나 다른 재료와 조합', knife:'생선·게 손질, 코코넛, 정글(통나무)',
+    signal:'맑은 아침마다 지나가는 배를 볼 수 있어요 (항로 기록 3이면 🕯️ 횃불·✨ 불씨를 올려 연기)', raft:'큰 폭풍이 지난 다음 날 06~12시에 🌊 얕은 바다에 올리면 출항', bigraft:'큰 폭풍이 지난 다음 날 06~12시에 🌊 얕은 바다에 올리면 출항 (선장 + 4명)',
     spear:'🌊 얕은 바다에 올려 낚시', rod:'🌊 얕은 바다에 올려 낚시', drill:'섬유와 합치면 불씨', torch:'밤에 해변 말고도 살필 수 있어요',
   };
-  toast(`${d.e} ${d.n}${card.dur ? ` · 내구 ${card.dur}/${maxDur(card)}` : ''}${FAC[card.k] ? ` · 내구 ${Math.ceil(fdOf(card) - 1e-6)}/${FAC[card.k].max} (보수: ${fixList(card.k)})` : ''}${tips[card.k] ? ' — ' + tips[card.k] : ''}`);
+  toast(`${d.e} ${d.n}${card.dur ? ` · 내구 ${card.dur}/${maxDur(card)}` : ''}${FAC[card.k] ? ` · 내구 ${Math.ceil(fdOf(card) - 1e-6)}/${fmax(card.k)} (보수: ${fixList(card.k)})` : ''}${tips[card.k] ? ' — ' + tips[card.k] : ''}`);
 }
 
 /* ---------- 시트 (도감·도움말·사망·특성) ---------- */
@@ -1249,12 +1309,15 @@ $('#overlay').addEventListener('click', e => {
   if (b.dataset.rest) return rest(+b.dataset.rest);
   if (b.dataset.act) return ACTIONS[b.dataset.act](b);
 });
-function showBook() {
+function showBook(tab) {
+  tab = tab || 'rcp';
+  const tabs = `<div class="tabs"><button data-act="book" data-tab="rcp" class="${tab === 'rcp' ? 'on' : ''}">📖 조합</button><button data-act="book" data-tab="crew" class="${tab === 'crew' ? 'on' : ''}">⚓ 선원 명부</button><button data-act="book" data-tab="story" class="${tab === 'story' ? 'on' : ''}">📔 이야기</button></div>`;
+  if (tab !== 'rcp') { $('#sheet').dataset.modal = ''; sheet(tabs + (tab === 'crew' ? `<h2>⚓ 선원 명부</h2>${rosterHTML()}` : storyHTML()) + '<div class="btns"><button data-close>닫기</button></div>'); return; }
   const known = BOOK.filter(b => meta.discovered[b[0]]);
   const sil = BOOK.filter(b => !meta.discovered[b[0]] && b[4] && meta.discovered[b[4]]);
   const hidden = BOOK.length - known.length - sil.length;
   $('#sheet').dataset.modal = '';
-  sheet(`<h2>📖 조합 도감 <span class="muted">${known.length}/${BOOK.length}</span></h2>
+  sheet(tabs + `<h2>📖 조합 도감 <span class="muted">${known.length}/${BOOK.length}</span></h2>
     <p class="muted">알아낸 조합은 죽어도 남습니다.</p>
     ${known.map(b => `<div class="rcp"><span class="e">${b[1]}</span><div><b>${b[2]}</b><small>${b[3]}</small></div></div>`).join('') || '<p>아직 알아낸 조합이 없어요. 카드를 겹쳐 보세요!</p>'}
     ${sil.map(b => `<div class="rcp unk"><span class="e">${b[1]}</span><div><b>???</b><small>앞 단계를 만들어 본 조합 · 재료 숨김</small></div></div>`).join('')}
@@ -1269,6 +1332,10 @@ function showHelp() {
   $('#sheet').dataset.modal = '';
   sheet(`<h2>🏝️ 카드 무인도 — 프로토타입</h2>
     <ul>
+      <li>⚓ <b>선장</b>: 바다제비호의 선원 일곱이 섬 곳곳에 흩어졌어요. 시작할 때 배(🎣 어선 / 📦 운반선)를 고르면 시작 능력이 달라져요.</li>
+      <li>👣 <b>선원 구조</b>: 장소를 살피다 흔적 카드가 나오면 <b>그 장소 카드 위에</b> 올려 찾아요(30분). 지친 선원에게 물이나 음식 1장을 올리면 동료가 돼요. 한 판에 살아 있는 선원은 3~4명, 나머지는 유품만 남아요.</li>
+      <li>👥 <b>동료</b>: 동료 카드를 장소·🔥 모닥불·🏕️ 기지·🗼 신호대에 올리면 낮(06~18시) 동안 알아서 일해요(시간이 흘러야 함). 음식·물을 올려 먹여요 (0인 채 24시간이면 떠나요). 장소에 보낼 수 있는 동료는 2명(🛖 오두막 3명). 곁에 있는 선원의 일을 따라 하면 선장도 그 능력을 배워요 (이번 삶에서만).</li>
+      <li>🏁 <b>엔딩 (임시)</b>: 🗼 신호대(통나무 2 + 잎 4 더미 → 기지) → 맑은 아침 지나가는 배 3번 → 🕯️ 횃불을 올려 연기 → 다음 맑은 아침 구조. 또는 🛶 뗏목(통나무 4 + 노끈 4 + 잎 2 더미 → 기지) → 큰 폭풍이 지난 다음 날 06~12시에 🌊 얕은 바다에 올려 출항 (물·구운 음식 필요). 데려간 선원 수에 따라 결말이 달라져요.</li>
       <li><b>끌어서 놓기</b>: 카드를 다른 카드 위에 놓으면 조합하거나 쌓아요.</li>
       <li>같은 카드 <b>한 장 위에 한 장</b> = 조합 (예: 🪨+🪨 = 날 선 돌). 같은 카드 <b>더미 위</b>에 놓으면 그냥 쌓기.</li>
       <li>재료가 셋 이상인 조합은 <b>하나씩 차례로</b> 쌓아요. 맞지 않는 카드는 튕겨 나와요.</li>
@@ -1303,7 +1370,9 @@ function sndMenuHTML() {
 function showMenu(keep) {
   $('#sheet').dataset.modal = '';
   const html = `<h2>메뉴</h2><p class="muted">각인 점수 ${meta.points} · 지난 삶 ${meta.lives}번 · 최고 생존 ${meta.bestDays}일 · 알아낸 조합 ${Object.keys(meta.discovered).length}/${BOOK.length}</p>
+    ${S && S.ship ? `<p class="muted">⚓ ${SHIPS[S.ship].e} ${SHIPS[S.ship].n} · 동료 ${mates().length}명 · 집으로 보낸 선원 ${homeN()}/7</p>` : `<p class="muted">⚓ 이 삶은 예전 방식이에요. 포기하고 다음 삶을 시작하면 배를 고르고 선원 이야기가 시작돼요.</p>`}
     ${sndMenuHTML()}
+    ${DEBUG ? `<h3>🛠 디버그</h3><div class="btns"><button data-act="dbg" data-f="roster">명부 7명 귀환으로 채우기</button><button data-act="dbg" data-f="rosterClear">명부·엔딩 기록 비우기</button><button data-act="dbg" data-f="traces">남은 흔적 카드 모두 꺼내기</button><button data-act="dbg" data-f="feed">선원 배부르게</button><button data-act="dbg" data-f="signal">신호대 + 항로 기록 3 + 횃불</button><button data-act="dbg" data-f="escape">뗏목·보급품 + 폭풍 다음 날 아침</button></div>` : ''}
     <div class="btns"><button data-act="giveup">이번 삶 포기 (정산)</button><button data-act="wipe">전체 기록 초기화</button><button data-close>닫기</button></div>`;
   if (keep) $('#sheet').innerHTML = html; else sheet(html);
 }
@@ -1317,6 +1386,7 @@ function die() {
   S.dead = true; S.scored = true;
   const sc = score(); S.final = sc;
   meta.points += sc.total; meta.lives++; meta.bestDays = Math.max(meta.bestDays, S.life.surv);
+  if (S.ship) meta.storyLives = (meta.storyLives || 0) + 1;
   saveMeta(); saveRun();
 }
 function showDeath() {
@@ -1344,13 +1414,17 @@ function showDeath() {
     <p class="muted">${known.map(b => b[1] + ' ' + b[2]).join(' · ') || '없음'}</p>
     <div class="btns"><button class="pri" data-act="restart">다시 시작</button></div>`);
 }
-let pickTraits = [], pickNaked = false;
+let pickTraits = [], pickNaked = false, pickShip = null;
 function slots() { return meta.bestDays >= 14 ? 4 : meta.bestDays >= 7 ? 3 : 2; }
 function showTraits() {
   pickTraits = pickTraits.filter(id => meta.unlocked[id]);
   $('#sheet').dataset.modal = '1';
   const sl = slots();
-  sheet(`<h2>🌅 새 삶 — 특성 고르기</h2>
+  pickShip = pickShip || meta.lastShip || 'fish';
+  sheet(`<h2>⚓ 바다제비호 — 배 고르기</h2>
+    <p class="muted">선원 일곱을 태운 바다제비호의 선장. 이번 항해는 어떤 배였나요?</p>
+    <div class="ship">${Object.entries(SHIPS).map(([id, sh]) => `<button data-act="ship" data-id="${id}" class="${pickShip === id ? 'on' : ''}"><b>${sh.e} ${sh.n}</b><small>${sh.d}</small>${sh.ab.map(a => `<small>${a}</small>`).join('')}</button>`).join('')}</div>
+    <h2 style="margin-top:14px">🌅 특성 고르기</h2>
     <p>각인 점수 <b>✦ ${meta.points}</b> · 슬롯 <b>${pickTraits.length}/${sl}칸</b> <span class="muted">(최고 생존 ${meta.bestDays}일 · 7일 3칸, 14일 4칸)</span></p>
     ${TRAITS.map(t => {
       const ap = meta.appeared[t.id], un = meta.unlocked[t.id], sel = pickTraits.includes(t.id);
@@ -1359,7 +1433,7 @@ function showTraits() {
         ${un ? `<button data-act="pick" data-id="${t.id}">${sel ? '빼기' : '고르기'}</button>` : `<button data-act="unlock" data-id="${t.id}" ${meta.points >= t.cost ? '' : 'disabled'}>해금 ${t.cost}점</button>`}</div>`;
     }).join('')}
     <div class="trait ${pickNaked ? 'sel' : ''}"><div class="tx"><b>맨몸 시작</b><br>특성 없이 시작, 이번 삶 각인 점수 ×1.5</div><button data-act="naked">${pickNaked ? '끄기' : '켜기'}</button></div>
-    <div class="btns"><button class="pri" data-act="go">출발 (${pickNaked ? '맨몸' : pickTraits.map(id => TRAITS.find(t => t.id === id).n).join(', ') || '특성 없음'})</button></div>`);
+    <div class="btns"><button class="pri" data-act="go">출발 — ${SHIPS[pickShip].e} ${SHIPS[pickShip].n} · ${pickNaked ? '맨몸' : pickTraits.map(id => TRAITS.find(t => t.id === id).n).join(', ') || '특성 없음'}</button></div>`);
 }
 const ACTIONS = {
   snd() { SND.setOn(!SND.settings.on); syncSndBtn(); showMenu(true); },
@@ -1368,7 +1442,27 @@ const ACTIONS = {
   unlock(b) { const t = TRAITS.find(x => x.id === b.dataset.id); if (meta.points >= t.cost && !meta.unlocked[t.id]) { meta.points -= t.cost; meta.unlocked[t.id] = 1; saveMeta(); } showTraits(); },
   pick(b) { const id = b.dataset.id; if (pickTraits.includes(id)) pickTraits = pickTraits.filter(x => x !== id); else if (pickTraits.length < slots()) { pickTraits.push(id); pickNaked = false; } else toast('슬롯이 가득 찼어요.'); showTraits(); },
   naked() { pickNaked = !pickNaked; if (pickNaked) pickTraits = []; showTraits(); },
-  go() { meta.lastTraits = pickTraits.slice(); saveMeta(); delete $('#sheet').dataset.modal; closeSheet(); newGame(pickNaked ? [] : pickTraits, pickNaked); render(); toast('새 삶이 시작됐다. 🏖️ 해변을 탭해 보세요.'); },
+  go() { meta.lastTraits = pickTraits.slice(); meta.lastShip = pickShip; saveMeta(); delete $('#sheet').dataset.modal; closeSheet(); newGame(pickNaked ? [] : pickTraits, pickNaked, NOINTRO ? null : pickShip); sortBoard(true); render(); if (NOINTRO) toast('새 삶이 시작됐다. 🏖️ 해변을 탭해 보세요.'); else showIntro(); },
+  ship(b) {
+    pickShip = b.dataset.id; SND.play('stack');
+    document.querySelectorAll('#sheet .ship button').forEach(x => x.classList.toggle('on', x.dataset.id === pickShip));
+    const g = $('#sheet [data-act="go"]'); if (g) g.textContent = g.textContent.replace(/(🎣 어선|📦 운반선)/, `${SHIPS[pickShip].e} ${SHIPS[pickShip].n}`);
+  },
+  book(b) { showBook(b.dataset.tab); },
+  keepStory(b) { const c = allCards().find(x => x.id === +b.dataset.id); closeSheet(); if (!c) return; if (JOURNAL.some(j => j.id === c.k)) { meta.pieces[c.k] = 1; saveMeta(); say(`📔 ${K[c.k].n}을(를) 보관했다 (📖 도감 → 이야기).`); } else say(`${K[c.k].e} ${K[c.k].n}을(를) 챙겼다. ⚓ 선원 명부에 기록.`); removeCards([c]); after(); },
+  mateBase(b) { const m = allCards().find(x => x.id === +b.dataset.id); closeSheet(); if (m) { m.job = 'base'; say(`${cOf(m).n}: 🏕️ 기지에서 대기한다.`); after(); } },
+  depart() {
+    closeSheet();
+    const raft = findKind('bigraft') || findKind('raft'); if (!raft || S.dead) return;
+    const cap = raft.k === 'bigraft' ? 4 : 2, go = mates().slice(0, cap), nd = escapeNeeds(go.length), sp = supplyCards();
+    if (sp.w.length < nd.w || sp.f.length < nd.f) return toast('물·구운 음식이 모자라요.', 'bad');
+    removeCards(sp.w.slice(0, nd.w).concat(sp.f.slice(0, nd.f)));
+    discover('depart'); SND.play('splash'); saveRun(); render();
+    endingFlow('escape', go.map(m => cOf(m).id));
+  },
+  endLeave() { const p = S.endPending; if (p) finishEnding(p.type, p.crew, false); },
+  endStay() { const p = S.endPending; if (p) finishEnding(p.type, p.crew, true); },
+  dbg(b) { DBG[b.dataset.f](); closeSheet(); },
   eatRotten(b) { closeSheet(); const c = allCards().find(x => x.id === +b.dataset.id && x.k === 'rotten'); if (c && !S.dead) eat(c); },
   giveup() { if (!confirm('이번 삶을 포기하고 정산할까요?')) return; S.lastCause = '포기'; die(); render(); showDeath(); },
   wipe() { if (!confirm('각인 점수·도감·특성을 모두 지울까요?')) return; try { localStorage.removeItem(RUN_KEY); localStorage.removeItem(META_KEY); } catch (e) {} location.reload(); },
@@ -1376,7 +1470,7 @@ const ACTIONS = {
 
 /* ---------- 버튼 · 기본 동작 막기 ---------- */
 $('#bSort').addEventListener('click', () => { if (S && !S.dead) { sortBoard(); toast('정렬했어요.'); } });
-$('#bBook').addEventListener('click', showBook);
+$('#bBook').addEventListener('click', () => showBook());
 $('#bLog').addEventListener('click', showLog);
 $('#bHelp').addEventListener('click', showHelp);
 $('#bMenu').addEventListener('click', () => showMenu());
@@ -1539,6 +1633,7 @@ const SND = (() => {
       tone({t, f:440, f2:415, a:.08, d:.6, v:.025, type:'triangle'});
     },
     boar(t) { boarSound(t, sfx, .16, 0, 520); noise({t:t + .5, type:'lowpass', f:600, d:.15, v:.12}); tone({t:t + .5, f:110, f2:55, d:.25, v:.1}); },
+    wave(t) { noise({t, a:1.1, d:1.7, type:'lowpass', f:380, f2:1500, q:.4, v:.32, buf:brown}); noise({t:t + .9, a:.5, d:1.4, type:'highpass', f:2500, f2:900, v:.05}); },
     death(t) {
       [[440, 0], [349, .45], [262, .9]].forEach(([f, dt]) => tone({t:t + dt, f, a:.05, d:1.4, v:.07, type:'triangle', lp:1800}));
       tone({t, f:65, a:.6, d:2.6, v:.08});
@@ -1675,24 +1770,473 @@ const SND = (() => {
 })();
 function syncSndBtn() { const b = $('#bSnd'); if (b) b.textContent = SND.settings.on ? '🔊' : '🔇'; }
 
+/* ====== 〔스토리 v0.2 프로토〕 선장·배·선원·엔딩 (수치는 임시값) ====== */
+const QS = new URLSearchParams(location.search);
+const NOINTRO = QS.has('nointro'), DEBUG = QS.has('debug');
+const SHIPS = {
+  fish:{n:'어선', e:'🎣', d:'먹을 것에 강함 (생선 중심)', ab:['🎣 손에 밴 낚시: 창·낚싯대 성공률 +10%p', '🔺 선상 손질: 날 선 돌로도 생선 손질', '🐟 물고기 길목: 얕은 바다 물고기 최대 12→16, 하루 재생 +6→+8']},
+  cargo:{n:'운반선', e:'📦', d:'기지·항해에 강함', ab:['🏗️ 짐 부리는 손: 시설 짓는 시간 −25%', '🧱 단단히 묶기: 시설 최대 내구 +25%', '⛵ 배 다루는 법 (임시): 뗏목 노끈 4→3']},
+};
+const PLACE_JOB = ['beach','sea','flat','jungle','ledge'];
+// 선원 7명 (스토리 v0.2 3.3). 프로토에 없는 장소의 선원은 있는 장소로 옮김: 바늘 대나무 숲→바위턱, 달 동굴 아래쪽→얕은 바다, 할배 난파선→해변 80%, 윤 작은 무인도→바위턱 100%
+const CREW = [
+  {id:'sot', n:'솥', e:'🧑‍🍳', g:'isle', role:['요리사','요리사'], pers:'걱정이 많고, 걱정만큼 밥을 많이 한다.', at:'beach', exp:30, tr:['🍲','찌그러진 냄비'],
+   relic:'찌그러진 냄비. 바닥이 아직 그을려 있다. 주인은 보이지 않는다.', job:['🔥 모닥불에 올리면: 불 지키기(연료 넣기·비에 덜 꺼짐) + 보드의 날 음식 자동 굽기. 아침·저녁 6시에 다른 선원 배식','🔥 모닥불에 올리면: 불 지키기(연료 넣기·비에 덜 꺼짐) + 보드의 날 음식 자동 굽기. 아침·저녁 6시에 다른 선원 배식'],
+   learn:[[10,'굽기'],[10,'굽기']], ab:[['간 맞추기','구운 음식 포만감 +5'],['간 맞추기','구운 음식 포만감 +5']], line:'배에서 제일 먼저 일어나고 제일 늦게 잔다.'},
+  {id:'kong', n:'콩', e:'🧒', g:'isle', role:['견습 선원','견습 선원'], pers:'겁이 없고, 어디든 먼저 들어간다.', at:'flat', flatN:3, tr:['🐚','끊어진 조개 목걸이'],
+   relic:'끊어진 조개 목걸이. 바다에 들어가기 전 늘 만지작거리던 것이다.', job:['장소에 올리면: 1시간마다 살피기 (가끔 나오는 것 ×1.5)','장소에 올리면: 1시간마다 살피기 (가끔 나오는 것 ×1.5)'],
+   learn:[[15,'살피기'],[15,'살피기']], ab:[['눈 밝음','빈손일 때 3%로 귀한 것'],['눈 밝음','빈손일 때 3%로 귀한 것']], line:'첫 항해. 선장 모자를 몰래 써 본 적이 있다.'},
+  {id:'gom', n:'곰', e:'🧔', g:'isle', role:['갑판장','짐꾼 반장'], pers:'말이 없고, 무거운 건 말없이 든다.', at:'jungle', exp:50, tr:['🛶','부러진 노'],
+   relic:'부러진 노. 이걸 혼자 들 수 있는 사람은 하나뿐이다.', job:['🌴 정글에 올리면: 1시간마다 통나무 1 (보드의 🔪 칼·🔺 날 선 돌 사용, 내구 −1)','🌴 정글에 올리면: 1시간마다 통나무 1 (보드의 🔪 칼·🔺 날 선 돌 사용, 내구 −1)'],
+   learn:[[6,'통나무 베기'],[6,'통나무 베기']], ab:[['힘쓰기','통나무 베기 기운 −50%'],['힘쓰기','통나무 베기 기운 −50%']], line:'고향에 딸이 둘. 사진은 방수 주머니에.'},
+  {id:'nul', n:'바늘', e:'🧑‍🦰', g:'isle', role:['그물 수선공','돛 수선공'], pers:'투덜대면서도 손은 절대 대충 안 한다.', at:'ledge', exp:40, tr:['🧵','실 감긴 뼈바늘'],
+   relic:'실이 반쯤 감긴 뼈바늘. 매듭이 단정하다.', job:['🏕️ 기지에 올리면: 보드의 🌾 섬유 2장으로 1시간마다 노끈 1','🏕️ 기지에 올리면: 보드의 🌾 섬유 2장으로 1시간마다 노끈 1'],
+   learn:[[6,'노끈·창·낚싯대 만들기'],[6,'노끈·창·낚싯대 만들기']], ab:[['그물 손 (임시)','창·낚싯대 만들 때 내구 +4'],['바느질 (임시)','시설 보수량 +50%']], line:'그물 한 장 깁는 데 사흘. 대신 십 년을 간다.'},
+  {id:'dal', n:'달', e:'🤿', e2:'🧑‍🔧', g:'isle', role:['물질꾼','목수'], pers:'웃음이 크고, 지는 걸 싫어한다.', at:'sea', exp:40, tr:['🥽','깨진 물안경'], tr2:['🔨','손때 묻은 망치'],
+   relic:'깨진 물안경. 끈을 두 번 묶은 자국.', relic2:'손때 묻은 망치. 손잡이에 이름이 새겨져 있다.',
+   job:['🏝️ 갯벌·🌊 얕은 바다에 올리면: 1시간마다 살피기 (큰 조개 ×2)','🏕️ 기지에 올리면: 1시간마다 닳은 시설 하나 자동 보수 (보드의 재료 사용)'],
+   learn:[[10,'갯벌 살피기'],[3,'시설 보수']], ab:[['숨 참기 (임시)','갯벌 큰 조개 15→25%'],['못질','보수 시간 절반']], line:'물속에서는 누구에게도 안 진다.'},
+  {id:'hal', n:'할배', e:'👴', g:'sea', role:['늙은 어부','조타수'], pers:'말이 느리고, 날씨는 틀린 적이 없다.', at:'beach', exp:80, tr:['🧥','기워 입은 비옷'],
+   relic:'기워 입은 비옷. 주머니에 말린 생선 한 조각.', job:['🌊 얕은 바다에 올리면: 1시간마다 낚시 (보드의 🎣 낚싯대·🔱 창 사용, 내구 −1)','함께 있으면 뗏목 짓는 시간 절반 (작업대 대신 임시)'],
+   learn:[[1,'함께 폭풍 넘기기'],[1,'함께 폭풍 넘기기']], ab:[['바람 읽기','저녁 6시에 내일 날씨를 앎'],['바람 읽기','저녁 6시에 내일 날씨를 앎']], line:'이번이 마지막 항해라고, 매번 말한다.'},
+  {id:'yun', n:'윤', e:'🧑‍✈️', g:'sea', role:['항해사','항해사'], pers:'침착하고, 뭐든 적어 둔다.', at:'ledge', exp:100, tr:['📒','젖은 수첩 한 장'],
+   relic:'젖은 수첩. 글씨가 번져 읽을 수 없다. 마지막 장에만 \'선장님\'.', job:['🗼 신호대에 올리면: 배 지켜보기 (항로 기록 확률 40→60%)','🗼 신호대에 올리면: 배 지켜보기 (항로 기록 확률 40→60%)'],
+   learn:[[1,'함께 있을 때 장소 탐사 100%'],[1,'함께 있을 때 장소 탐사 100%']], ab:[['해도 그리기','살피기 탐사도 +1%p'],['해도 그리기','살피기 탐사도 +1%p']], line:'선장님 다음으로 이 바다를 잘 안다. 본인은 더 안다고 생각한다.'},
+];
+const CREWBY = Object.fromEntries(CREW.map(c => [c.id, c]));
+const JOURNAL = [
+  {id:'jn1', n:'항해일지 1장', at:'beach', exp:60, title:'일지 1 \'출항\'', txt:'바다제비호, 선원 일곱과 나. 할배 말로는 이 바다엔 꼭 7일마다 폭풍이 친다. 하루도 어긋난 적이 없단다. 모두 무사히 돌려보내는 게 내 일이다.'},
+  {id:'jn2', n:'항해일지 2장', at:'sea', exp:50, title:'일지 2 \'좌초\'', txt:'선장님이 파도에 휩쓸렸다. 대신 적는다. 배는 산호초에 걸렸고, 곰과 콩은 섬 안쪽 동굴로 갔다. 벽에 그림이 있다고 한다.'},
+  {id:'jn3', n:'항해일지 3장', at:'ledge', exp:70, title:'일지 3 \'해류\'', txt:'바늘이 줄에 나무를 매달아 물길을 쟀다. 폭풍이 지난 다음 날 아침에만 바깥으로 돈다. 세 번 쟀는데, 세 번 다 같은 시각이었다. 선장님을 찾으면 그날 같이 떠난다.'},
+];
+const COOKED = new Set(['clamc','crabc','crabkc','fishc','fishkc','eggc']);
+const WATERK = new Set(['rainw','cocoo','coco']);
+const sIdx = () => S && S.ship === 'cargo' ? 1 : 0;
+const cOf = c => CREWBY[c.k.slice(3)];
+const isMate = c => c && c.k.startsWith('cw_');
+const isTired = c => c && c.k.startsWith('ct_');
+const isTrace = c => c && c.k.startsWith('cx_');
+const isRelic = c => c && c.k.startsWith('cr_');
+const crewCards = () => allCards().filter(c => isMate(c) || isTired(c));
+const mates = () => allCards().filter(isMate);
+const mateOf = id => allCards().find(c => c.k === 'cw_' + id);
+const crewTr = c => (S && S.ship === 'cargo' && c.tr2) ? c.tr2 : c.tr;
+const josa = (w, a, b) => { const ch = w.charCodeAt(w.length - 1); return (ch >= 0xac00 && ch <= 0xd7a3 && (ch - 0xac00) % 28) ? a : b; };
+const fmax = k => Math.floor(FAC[k].max * (S && S.ship === 'cargo' ? 1.25 : 1));
+for (const c of CREW) {
+  K['cx_' + c.id] = {n:c.tr[1], e:c.tr[0], cat:'story', who:c.id};
+  K['cr_' + c.id] = {n:c.tr[1] + ' (유품)', sn:'유품', e:c.tr[0], cat:'story', who:c.id};
+  K['ct_' + c.id] = {n:'지친 ' + c.n, e:c.e, cat:'crew', who:c.id};
+  K['cw_' + c.id] = {n:c.n, e:c.e, cat:'crew', who:c.id};
+}
+for (const j of JOURNAL) K[j.id] = {n:j.n, sn:'항해일지', e:'📔', cat:'story'};
+Object.assign(K, {signal:{n:'신호대',e:'🗼',cat:'fac'}, raft:{n:'뗏목',e:'🛶',cat:'fac'}, bigraft:{n:'큰 뗏목',e:'🚣',cat:'fac'}});
+['signal','raft','bigraft'].forEach(k => FIXED.add(k));
+CAT_ORDER.crew = -1; CAT_ORDER.story = -.5;
+RECIPES.push(
+  {id:'signal', out:'signal', inp:{log:2, leaf:4}, t:60, e:5, unique:['signal'], fac:1},
+  {id:'raft', out:'raft', inp:{log:4, rope:4, leaf:2}, t:120, e:10, unique:['raft','bigraft'], fac:1},
+  {id:'bigraft', out:'bigraft', inp:{raft:1, log:2, rope:2}, t:60, e:5, unique:['bigraft'], up:'raft'},
+);
+BOOK.push(
+  ['rescue','👣','선원 찾기','👣 흔적 카드 → 그 장소 카드 (30분) · 😮‍💨 지친 선원에게 물이나 음식 1장 → 동료'],
+  ['signal','🗼','신호대 (임시)','🪵 통나무 ×2 + 🍃 잎 ×4 더미 → 🏕️ 기지 · 맑은 아침마다 40%로 지나가는 배를 봄 (항로 기록)'],
+  ['smoke','🟡','신호 연기 (임시)','🕯️ 횃불 / ✨ 불씨 → 🗼 신호대 (맑은 낮) · 항로 기록 3이면 다음 맑은 아침에 구조선','signal'],
+  ['raft','🛶','뗏목 (임시)','🪵 통나무 ×4 + 🧶 노끈 ×4 (운반선 3) + 🍃 잎 ×2 더미 → 🏕️ 기지 · 정원 선장 + 2명'],
+  ['bigraft','🚣','큰 뗏목 (임시)','🛶 뗏목 위에 🪵 통나무 ×2 + 🧶 노끈 ×2 (또는 그 더미를 🏕️ 기지에) · 정원 선장 + 4명','raft'],
+  ['depart','🌊','출항 (임시)','🛶 뗏목 → 🌊 얕은 바다 · 큰 폭풍이 지난 다음 날 06~12시 · 물 2 + 구운 음식 4 (동료 1명당 물 1 + 구운 음식 2 더)','raft'],
+);
+BOOK_IDS.clear(); BOOK.forEach(b => BOOK_IDS.add(b[0]));
+function applyShipRecipes() { RECIPES.find(r => r.id === 'raft').inp.rope = S && S.ship === 'cargo' ? 3 : 4; }
+function recipeTime(r) {
+  let t = r.t;
+  if (S.ship === 'cargo' && (r.fac || r.up)) t = Math.round(t * .75);
+  if ((r.id === 'raft' || r.id === 'bigraft') && S.ship === 'cargo' && mateOf('hal')) t = Math.round(t * .5);
+  return t;
+}
+const rosterOf = id => (meta.roster[id] = meta.roster[id] || {});
+const homeAll = () => CREW.every(c => meta.roster[c.id] && meta.roster[c.id].home);
+const homeN = () => CREW.filter(c => meta.roster[c.id] && meta.roster[c.id].home).length;
+function pickCrew() {
+  if (!meta.storyLives) return ['sot', 'kong', 'gom', 'hal'];
+  const w = id => (meta.roster[id] && meta.roster[id].home) ? 1 : 2;
+  const take = (ids, n) => { const pool = ids.slice(), out = []; while (out.length < n && pool.length) { const tot = pool.reduce((s, id) => s + w(id), 0); let r = rnd() * tot; let i = 0; for (; i < pool.length - 1; i++) { r -= w(pool[i]); if (r < 0) break; } out.push(pool.splice(i, 1)[0]); } return out; };
+  return take(CREW.filter(c => c.g === 'isle').map(c => c.id), rnd() < .5 ? 2 : 3).concat(take(['hal', 'yun'], 1));
+}
+function learn(id) {
+  if (!S.crew || S.learned[id] || !mateOf(id)) return;
+  const c = CREWBY[id], [need] = c.learn[sIdx()];
+  S.lc[id] = (S.lc[id] || 0) + 1;
+  if (S.lc[id] >= need) { S.learned[id] = 1; SND.q('discover'); say(`✦ ${c.n}에게 배웠다: ${c.ab[sIdx()][0]} — ${c.ab[sIdx()][1]} (이번 삶에서만)`, 'disc'); }
+}
+const L_ = id => !!(S && S.learned && S.learned[id]);
+/* --- 흔적·일지 등장 (살피기 뒤) --- */
+function storySpawn(k, st) {
+  if (!S.crew) return;
+  for (const c of CREW) {
+    if (c.at !== k || S.crew.st[c.id]) continue;
+    const okc = k === 'flat' ? S.flatN >= c.flatN : S.places[k].exp >= c.exp;
+    if (!okc) continue;
+    S.crew.st[c.id] = 'trace'; spawnNear(mk('cx_' + c.id), st); SND.q('discover');
+    const tr = crewTr(c);
+    say(`👣 흔적 발견: ${tr[0]} ${tr[1]}. 이 카드를 ${K[k].e} ${K[k].n}에 올려 주인을 찾아보자.`, 'disc');
+    return;
+  }
+  for (let i = 0; i < JOURNAL.length; i++) {
+    const j = JOURNAL[i];
+    if (j.at !== k || meta.pieces[j.id] || S.flags[j.id] || (i && !meta.pieces[JOURNAL[i - 1].id])) continue;
+    if (S.places[k].exp < j.exp) continue;
+    S.flags[j.id] = 1; spawnNear(mk(j.id), st); SND.q('discover'); say(`📔 젖은 종이 한 장 — ${j.n}. 탭해서 읽기`, 'disc');
+    return;
+  }
+}
+/* --- 흔적 → 찾아 나서기 --- */
+function searchTrace(card, placeSt) {
+  const c = cOf(card), k = placeSt.cards[0].k;
+  if (!canExplore(k)) return toast(k === 'flat' ? '🌊 갯벌은 썰물 때만 찾을 수 있어요.' : '🌙 밤에는 횃불이 있어야 찾을 수 있어요.', 'bad');
+  if (!canAct(4)) return;
+  act(30, 4, () => {
+    discover('rescue');
+    const alive = S.crew.alive.includes(c.id);
+    const tst = stackOf(card);
+    removeCards([card]);
+    if (alive) {
+      const t = mk('ct_' + c.id); t.h = 20; t.w = 20; t.zero = 0;
+      spawnAt(t, tst || placeSt); S.crew.st[c.id] = 'tired'; rosterOf(c.id).seen = 1; saveMeta(); SND.q('catch');
+      say(`😮‍💨 ${c.n}${josa(c.n, '을', '를')} 찾았다! 지쳐 쓰러져 있다. 물이나 음식 1장을 올려 주자.`, 'good');
+    } else {
+      spawnAt(mk('cr_' + c.id), tst || placeSt); S.crew.st[c.id] = 'relic'; rosterOf(c.id).seen = 1; saveMeta();
+      say(`${crewTr(c)[0]} 주인은 보이지 않는다… 유품을 찾았다. (탭해서 보기)`);
+    }
+  });
+}
+/* --- 먹이기 --- */
+function canFeed(a) { const d = K[a.k]; return d && d.eat && !d.closed && !d.noRaw && a.k !== 'rotten'; }
+function feedCrew(food, cc) {
+  const d = K[food.k], c = cOf(cc);
+  removeCards([food]);
+  act(5, 0, () => {
+    SND.q(d.cat === 'water' ? 'drink' : 'eat');
+    cc.h = clamp((cc.h || 0) + (d.eat.h || 0)); cc.w = clamp((cc.w || 0) + (d.eat.t || 0)); cc.zero = 0;
+    if (isTired(cc)) {
+      cc.k = 'cw_' + c.id; cc.h = Math.max(cc.h, 50); cc.w = Math.max(cc.w, 50); cc.job = 'base'; cc.workH = 0;
+      S.crew.st[c.id] = 'mate'; rosterOf(c.id).met = 1; saveMeta(); SND.q('discover');
+      say(`🙌 ${c.n}${josa(c.n, '이', '가')} 정신을 차렸다! "선장님…!" — ${c.role[sIdx()]} ${c.n}, 동료가 됐다. 장소·🔥·🏕️ 기지에 올려 일을 맡겨 보자.`, 'disc');
+    } else say(`${d.e} ${c.n}에게 ${d.n}을(를) 줬다. 포만감 ${Math.round(cc.h)} · 수분 ${Math.round(cc.w)}`);
+  });
+}
+/* --- 일 맡기기 --- */
+const placeCap = () => hasHut() ? 3 : 2;
+function jobOf(root) {
+  if (PLACE_JOB.includes(root.k)) return root.k;
+  if (root.k === 'fire' || root.k === 'firex') return 'fire';
+  if (root.k === 'signal') return 'signal';
+  if (root.k === 'base' || FAC[root.k] || ['compost','raft','bigraft'].includes(root.k)) return 'base';
+  return null;
+}
+const JOBNM = {beach:'🏖️ 해변', sea:'🌊 얕은 바다', flat:'🏝️ 갯벌', jungle:'🌴 정글', ledge:'⛰️ 바위턱', fire:'🔥 모닥불', base:'🏕️ 기지', signal:'🗼 신호대'};
+function assignJob(m, root) {
+  const j = jobOf(root), c = cOf(m);
+  if (!j) { toast(`${c.n}: 장소·🔥 모닥불·🏕️ 기지·🗼 신호대에 올리면 일을 맡아요.`); SND.play('reject'); return render(); }
+  if (PLACE_JOB.includes(j) && !PLACE_JOB.includes(m.job)) {
+    const n = mates().filter(x => x !== m && PLACE_JOB.includes(x.job)).length;
+    if (n >= placeCap()) { toast(`장소에 데리고 다닐 수 있는 선원은 ${placeCap()}명이에요${hasHut() ? '' : ' (🛖 오두막이 있으면 3명)'}. 나머지는 🏕️ 기지·🔥 모닥불에서 일해요.`, 'bad'); SND.play('reject'); return render(); }
+  }
+  m.job = j; SND.play('stack');
+  say(`${c.e} ${c.n}: ${JOBNM[j]}에서 일한다. (낮 06~18시, 시간이 흘러야 일해요${j === 'fire' ? ' · 불 지키기는 밤에도' : ''})`);
+  after();
+}
+function crewDrop(a, T) {
+  const tRoot = T.cards[0], tTop = T.cards[T.cards.length - 1];
+  if (isMate(a)) { assignJob(a, tRoot); return true; }
+  if (isTired(a)) { toast('지친 선원에게 물이나 음식을 올려 주세요.'); SND.play('reject'); render(); return true; }
+  if ((isMate(tTop) || isTired(tTop)) && T.cards.length === 1) {
+    if (canFeed(a)) { feedCrew(a, tTop); return true; }
+    toast(a.k === 'coco' ? '🥥 코코넛은 먼저 깨야 해요.' : `선원에게는 물·음식만 줄 수 있어요.`); SND.play('reject'); render(); return true;
+  }
+  if (isTrace(a) && T.cards.length === 1 && K[tRoot.k].cat === 'place') {
+    const c = cOf(a);
+    if (tRoot.k === c.at) { searchTrace(a, T); return true; }
+    toast(`이 흔적은 ${K[c.at].e} ${K[c.at].n}에서 찾을 수 있어요.`); SND.play('reject'); render(); return true;
+  }
+  return false;
+}
+/* --- 동료 1시간 처리 (시간이 흐를 때만) --- */
+function give(k, nearSt) {
+  const pile = S.stacks.find(st => !FIXED.has(st.cards[0].k) && st.cards.every(c => c.k === k));
+  if (pile) pile.cards.push(mk(k)); else spawnNear(mk(k), nearSt);
+  S.crewGain[k] = (S.crewGain[k] || 0) + 1;
+}
+const placeSt = k => S.stacks.find(st => st.cards.length === 1 && st.cards[0].k === k);
+function crewRoll(k, m) {
+  const P = S.places[k], rare = k === 'flat' ? 2 : 3;
+  let tbl = dropTable(k).map(([rk, pr, pool], i) => [rk, pr * (m.k === 'cw_kong' && i >= rare ? 1.5 : 1) * (m.k === 'cw_dal' && S.ship === 'fish' && rk === 'bigclam' ? 2 : 1), pool]);
+  let roll = rnd() * 100;
+  for (const [rk, pr, pool] of tbl) { if (roll < pr) { const p = P.pools[pool]; if (p[0] > 0) { p[0]--; give(rk, placeSt(k)); } return; } roll -= pr; }
+}
+function crewWork(m) {
+  const c = cOf(m), j = m.job;
+  if (PLACE_JOB.includes(j)) {
+    if (j === 'flat' && !flatOpen()) return;
+    if (c.id === 'gom' && j === 'jungle') {
+      const tool = allCards().find(x => x.k === 'knife' && x.dur > 0) || allCards().find(x => x.k === 'sharp' && x.dur > 0);
+      const p = S.places.jungle.pools.log;
+      if (tool && p[0] > 0) { p[0]--; wear(tool); give('log', placeSt('jungle')); return; }
+    }
+    if (c.id === 'hal' && j === 'sea' && S.ship === 'fish') {
+      const tool = allCards().find(x => x.k === 'rod' && x.dur > 0) || allCards().find(x => x.k === 'spear' && x.dur > 0);
+      const p = S.places.sea.pools.fish;
+      if (tool) { wear(tool); if (p[0] > 0 && rnd() < (tool.k === 'rod' ? .8 : .7)) { p[0]--; give('fish', placeSt('sea')); } return; }
+    }
+    return crewRoll(j, m);
+  }
+  if (j === 'base') {
+    if (c.id === 'nul') { const fs = allCards().filter(x => x.k === 'fiber').slice(0, 2); if (fs.length === 2) { removeCards(fs); give('rope', placeSt('base')); } }
+    if (c.id === 'dal' && S.ship === 'cargo') {
+      for (const f of allCards().filter(x => FAC[x.k])) {
+        if (fdOf(f) > fmax(f.k) * .7) continue;
+        const mat = allCards().find(x => FAC[f.k].fix[x.k === 'vine' ? 'rope' : x.k] && !isMate(x));
+        if (!mat) continue;
+        const add = FAC[f.k].fix[mat.k === 'vine' ? 'rope' : mat.k];
+        removeCards([mat]); f.fd = Math.min(fmax(f.k), fdOf(f) + add); if (f.fd > fmax(f.k) * .3) delete f.fdw;
+        S.crewGain['🔨' + K[f.k].n] = (S.crewGain['🔨' + K[f.k].n] || 0) + 1; break;
+      }
+    }
+  }
+}
+function crewFire(m) {
+  const f = allCards().find(x => x.k === 'fire'); if (!f) return;
+  if (f.fuel < 90) { const fuel = allCards().find(x => x.k === 'stick' || x.k === 'plank'); if (fuel) { removeCards([fuel]); f.fuel = Math.min(720, f.fuel + 120); S.crewGain['🔥연료'] = (S.crewGain['🔥연료'] || 0) + 1; } }
+  if (cOf(m).id === 'sot' && !f.cook) { const raw = allCards().find(x => K[x.k].cook && !isMate(x)); if (raw) { removeCards([raw]); f.cook = {k:raw.k, until:S.t + 20, crew:1}; } }
+}
+function crewFeedAll() {
+  const sot = mateOf('sot'); if (!sot || sot.h <= 20 || sot.w <= 20) return;
+  let fed = 0;
+  for (const m of mates()) {
+    if (m.h < 60) { const f = allCards().find(x => COOKED.has(x.k)) || allCards().find(x => canFeed(x) && K[x.k].cat === 'food' && !K[x.k].raw); if (f) { removeCards([f]); m.h = clamp(m.h + (K[f.k].eat.h || 0)); m.w = clamp(m.w + (K[f.k].eat.t || 0)); fed++; } }
+    if (m.w < 60) { const w = allCards().find(x => x.k === 'rainw' || x.k === 'cocoo'); if (w) { removeCards([w]); m.w = clamp(m.w + K[w.k].eat.t); m.h = clamp(m.h + (K[w.k].eat.h || 0)); fed++; } }
+  }
+  if (fed) say(`🍲 솥이 배식했다 (${fed}번). 보드의 음식·물을 썼다.`);
+}
+function crewHour(m) {
+  if (!S.crew) return;
+  const h = m / 60, dayWork = m >= 420 && m <= 1080;
+  if (m === 360) for (const c of mates()) c.workH = 0;
+  for (const c of crewCards()) {
+    c.h = clamp((c.h || 0) - 3); c.w = clamp((c.w || 0) - 4);
+    if (c.h <= 0 || c.w <= 0) { c.zero = (c.zero || 0) + 60; if (c.zero === 60) say(`⚠️ ${cOf(c).n}${josa(cOf(c).n, '이', '가')} ${c.h <= 0 ? '굶주리고' : '목말라하고'} 있다! 24시간이 지나면 떠나요.`, 'bad'); }
+    else c.zero = 0;
+    if (c.zero >= 1440) { const cr = cOf(c); removeCards([c]); S.crew.st[cr.id] = 'gone'; say(`😢 ${cr.n}${josa(cr.n, '이', '가')} 견디지 못하고 떠났다. (이번 삶에서는 다시 볼 수 없어요)`, 'bad'); continue; }
+    if (!isMate(c) || S.storm || c.h <= 20 || c.w <= 20) continue;
+    if (c.job === 'fire') crewFire(c);
+    if (dayWork && c.job && c.job !== 'fire' && (c.workH || 0) < 8) { c.workH = (c.workH || 0) + 1; crewWork(c); }
+  }
+  if (m === 360 || m === 1080) crewFeedAll();
+  if (m === 1080 && L_('hal')) { const d = day() + 1; S.nextRain = rnd() < Math.min(.40, .20 + .01 * (d - 1)); say(`🌬️ (바람 읽기) 내일은 ${S.nextRain ? '🌧️ 비가 온다' : '☀️ 맑다'}.`); }
+  if (h === 6 && S.crew) dawnStory();
+}
+function crewGainFlush() {
+  if (!S.crewGain || !Object.keys(S.crewGain).length) return;
+  const parts = Object.entries(S.crewGain).map(([k, n]) => K[k] ? `${K[k].e}${K[k].n} +${n}` : `${k} ${n}`);
+  say(`👥 동료 작업: ${parts.join(', ')}`);
+  S.crewGain = {};
+}
+/* --- 신호대·구조 (임시) --- */
+function dawnStory() {
+  if (findKind('signal') && !S.rain && !S.storm && S.ships < 3) {
+    const y = mateOf('yun'), p = (y && y.job === 'signal' && y.h > 20 && y.w > 20) ? .6 : .4;
+    if (rnd() < p) { S.ships++; say(`🚢 수평선 끝을 배가 지나갔다. 항로 기록 ${S.ships}/3${S.ships >= 3 ? ' — 🗼 신호대에 🕯️ 횃불(또는 ✨ 불씨)을 올려 연기를 피우자' : ''}`, 'disc'); }
+  }
+  if (S.rescueReady && !S.rain && !S.storm) S.pendingEnd = {type:'rescue'};
+}
+function lightSignal(a, b) {
+  if (S.rescueReady) return {msg:'🟡 이미 연기를 올렸어요. 다음 맑은 아침을 기다려요.'};
+  if (isNight() || isWet()) return {msg:'연기는 맑은 낮에만 멀리 보여요.'};
+  if (S.smokeDay === day()) return {msg:'오늘은 이미 연기를 피웠어요. 내일 다시.'};
+  return {e:1, run:() => act(10, 1, () => {
+    if (a.k === 'torch') wear(a); else removeCards([a]);
+    S.smokeDay = day(); discover('smoke'); SND.q('ignite');
+    if (S.ships >= 3) { S.rescueReady = 1; say('🟡 노란 연기가 높이 오른다. 다음 맑은 아침, 배가 올 것 같다.', 'disc'); }
+    else say(`🌫️ 연기만 피어오른다… 지나가는 배를 더 지켜봐야 한다 (항로 기록 ${S.ships}/3).`, 'bad');
+  })};
+}
+/* --- 출항 (임시) --- */
+function escapeNeeds(n) { return {w:2 + n, f:4 + n * 2}; }
+function supplyCards() { return {w:allCards().filter(c => WATERK.has(c.k)), f:allCards().filter(c => COOKED.has(c.k))}; }
+function tryDepart(raft) {
+  const h = mod() / 60;
+  if (!(S.calmDay === day() && h >= 6 && h < 12)) return {msg:'🌊 아직 해류가 섬 쪽으로 분다. (큰 폭풍이 지난 다음 날 06~12시에만 바깥으로 돌아요)'};
+  return {run:() => showDepart(raft)};
+}
+function showDepart(raft) {
+  const cap = raft.k === 'bigraft' ? 4 : 2, ms = mates(), go = ms.slice(0, cap), n = go.length, nd = escapeNeeds(n), sp = supplyCards();
+  const ok = sp.w.length >= nd.w && sp.f.length >= nd.f;
+  $('#sheet').dataset.modal = '';
+  sheet(`<h2>🛶 출항 준비</h2>
+    <p>해류가 바깥으로 돈다. ${K[raft.k].e} ${K[raft.k].n} 정원: 선장 + ${cap}명</p>
+    <p>함께 탈 선원: <b>${go.map(m => cOf(m).n).join(', ') || '없음 (혼자)'}</b>${ms.length > cap ? `<br><span class="muted">⚠️ ${ms.slice(cap).map(m => cOf(m).n).join(', ')}은(는) 자리가 없어 남아요 (🚣 큰 뗏목이면 4명).</span>` : ''}</p>
+    <p>필요한 것: 💧 물 ${nd.w} (가진 것 ${sp.w.length}) · 🍢 구운 음식 ${nd.f} (가진 것 ${sp.f.length})<br><span class="muted">물 = 고인 빗물·깬 코코넛·코코넛, 구운 음식 = 구운 생선·게·조개·새알</span></p>
+    <div class="btns"><button class="pri" data-act="depart" ${ok ? '' : 'disabled'}>출항한다</button><button data-close>아직</button></div>`);
+}
+/* --- 엔딩 --- */
+const END = {
+  rescue_0:{t:'구조 · 홀로 돌아온 선장', i:'🚢', l:['망루 위로 노란 연기가 오른다. 배 한 척이 방향을 튼다.', '사다리를 오르며 해변을 돌아본다. 아무도 따라오지 않는다.', '"다른 사람은?" 대답 대신 고개를 젓는다.', '섬 어딘가에 아직 누가 있을지 모른다. 그 생각을 안고 집으로 간다.']},
+  rescue_some:{t:'구조 · 돌아온 사람들', i:'🚢', l:['노란 연기를 보고 배가 온다. {이름} 먼저 손을 흔든다.', '갑판에서 머릿수를 센다. 일곱은 아니다. 그래도 빈손은 아니다.', '"이런 섬이 지도에 있었나?" 뱃사람이 묻는다.', '섬은 대답하지 않는다.']},
+  rescue_all:{t:'구조 · 다 같이, 집으로', i:'🚢', l:['노란 연기 아래, 이 섬에서 찾은 얼굴이 모두 모였다.', '배에 오르는 순서는 늘 같다. 선원들 먼저, 선장은 마지막.', '사다리 위에서 한 번 더 센다. 빠진 사람은 없다.', '섬이 무엇이었는지는 끝내 모른 채, 집으로 간다.']},
+  escape_0:{t:'탈출 · 혼자 탄 해류', i:'🛶', l:['폭풍이 지난 다음 날 아침, 해류가 바깥으로 돈다.', '돛 단 뗏목은 가볍다. 조금 너무 가볍다.', '작은 섬 바위에 이름을 새긴다. 누가 보면 따라오라고.', '사흘째 아침, 지나던 배가 뗏목을 건진다.']},
+  escape_some:{t:'탈출 · 작은 배의 선장', i:'🛶', l:['해류가 바깥으로 도는 아침, 뗏목에 {n}명이 오른다.', '노 젓는 박자가 금방 맞는다. 오래 같이 일한 사람들이다.', '다 데려오지는 못했다.', '그래도 이 배의 선장은 아직 나다.']},
+  escape_all:{t:'탈출 · 선장의 항해', i:'🚣', l:['큰 뗏목에 이번 섬에서 찾은 선원이 모두 오른다.', '작은 섬, 바깥 해류, 사흘 밤. 아무도 놓치지 않는다.', '지나가는 배가 보이자, 다 같이 노를 들어 흔든다.', '섬이 가르쳐 준 것들로, 다 같이 떠났다.']},
+  stay:{t:'섬에 남기', i:'✋', l:['배가 기다린다. 선원들이 먼저 오른다. 선장은 늘 마지막에 오르는 사람이다.', '이번엔 오르지 않는다. 일곱을 한 배에 태운 적은 없다. 그래도 일곱 모두를 집으로 보냈다.', '동굴 아래, 매끈한 벽에 손자국이 여덟 줄로 나 있다. 일곱 줄은 선원들 손 크기다. 마지막 줄에 손을 겹친다. 꼭 맞는다.', '쓰러질 때마다 같은 아침이 왔다. 같은 파도, 같은 폭풍, 매번 다른 얼굴들. 섬이 기억해 준 걸까, 누군가 적어 둔 걸까.', '배가 수평선 너머로 사라진다. 선장이 할 일은 끝났다. 해변에 병 하나를 띄운다. 다음 아침, 이 해변에서 눈을 뜰 누군가에게.']},
+};
+const ENDPTS = {rescue:[10, 3], escape:[15, 3], stay:[20, 5]};
+function endingFlow(type, crewIds) {
+  S.endPending = {type, crew:crewIds}; saveRun();
+  if (S.canStay) {
+    $('#sheet').dataset.modal = '1';
+    sheet(`<div class="big">${type === 'rescue' ? '🚢' : '🛶'}</div><h2 style="text-align:center">배에 오르기 직전</h2>
+      <p style="text-align:center">${crewIds.length ? crewIds.map(id => CREWBY[id].n).join(', ') + '이(가) 먼저 오른다.' : '배가 기다린다.'}<br>선장은 늘 마지막에 오르는 사람이다.</p>
+      <div class="btns"><button class="pri" data-act="endLeave">떠난다</button><button data-act="endStay">남는다</button></div>`);
+  } else finishEnding(type, crewIds, false);
+}
+function finishEnding(type, crewIds, stay) {
+  delete S.endPending;
+  const n = crewIds.length, N = S.crew.alive.length;
+  const cell = n === 0 ? '0' : n >= N ? 'all' : 'some';
+  const id = stay ? 'stay' : type + '_' + cell, E = END[id];
+  const nm = crewIds.length ? CREWBY[crewIds[0]].n : '';
+  const lines = E.l.map(s => s.replace('{이름}', nm + josa(nm || '가', '이', '가')).replace('{n}', n + 1));
+  for (const cid of crewIds) { const r = rosterOf(cid); r.met = 1; r.seen = 1; r.home = 1; }
+  const mth = stay ? 'stay' : type, first = !meta.endMethod[mth];
+  const ePts = ENDPTS[mth][first ? 0 : 1];
+  const cellFirst = !stay && cell !== '0' && !meta.endings[id];
+  const cPts = cellFirst ? (cell === 'all' ? 5 : 2) : 0;
+  meta.endMethod[mth] = (meta.endMethod[mth] || 0) + 1; meta.endings[id] = (meta.endings[id] || 0) + 1;
+  S.lastCause = E.t; S.dead = true; S.scored = true;
+  const sc = score(); sc.ending = ePts; sc.cell = cPts; sc.first = first; sc.total += ePts + cPts; S.final = sc;
+  S.ending = {id, t:E.t, i:E.i, lines, crew:crewIds, N, first};
+  meta.points += sc.total; meta.lives++; meta.storyLives = (meta.storyLives || 0) + 1; meta.bestDays = Math.max(meta.bestDays, S.life.surv);
+  saveMeta(); saveRun(); render();
+  setTimeout(showEnding, 120);
+}
+function showEnding() {
+  const E = S.ending, sc = S.final;
+  SND.play('discover');
+  $('#toasts').innerHTML = ''; $('#sheet').dataset.modal = '1';
+  sheet(`<div class="big">${E.i}</div><h2 style="text-align:center">${E.t}</h2>
+    <div class="endtxt">${E.lines.map(l => `<p>${l}</p>`).join('')}</div>
+    <p class="muted" style="text-align:center">${day()}일차 · 함께 떠난 선원 ${E.crew.length ? E.crew.map(id => CREWBY[id].n).join(', ') : '없음'} · 이번 판 살아 있던 선원 ${E.N}명</p>
+    <h3>✦ 각인 점수</h3>
+    <table class="score" style="width:100%">
+      <tr><td>생존 ${sc.surv}일 + 새 조합 ${sc.rec} + 새 장소 ${sc.plc} + 폭풍 ${sc.stm}${S.life.naked ? ' (맨몸 ×1.5)' : ''}</td><td>${sc.total - sc.ending - sc.cell}</td></tr>
+      <tr><td>엔딩 ${sc.first ? '첫 달성' : '다시 달성'}</td><td>+${sc.ending}</td></tr>
+      ${sc.cell ? `<tr><td>인원 보너스 (처음 본 칸)</td><td>+${sc.cell}</td></tr>` : ''}
+      <tr><td><b>이번 삶 합계</b></td><td>+${sc.total}</td></tr><tr><td>누적 각인 점수</td><td>${meta.points}</td></tr>
+    </table>
+    <h3>⚓ 선원 명부 — 집으로 보낸 선원 ${homeN()}/7</h3>
+    <p>${CREW.map(c => meta.roster[c.id] && meta.roster[c.id].home ? `<b>⛵${c.n}</b>` : `<span class="muted">${c.n}</span>`).join(' · ')}</p>
+    <div class="btns"><button class="pri" data-act="restart">다음 삶</button></div>`);
+}
+/* --- 탭: 선원·흔적·유품·일지 --- */
+function storyTap(card) {
+  if (isMate(card)) return showMate(card);
+  if (isTired(card)) return toast(`${K[card.k].e} ${K[card.k].n} — 물이나 음식 1장을 올려 주면 정신을 차려요. (포만감 ${Math.round(card.h)} · 수분 ${Math.round(card.w)})`);
+  if (isTrace(card)) { const c = cOf(card); return toast(`👣 ${K[card.k].n} — 누군가의 물건이다. ${K[c.at].e} ${K[c.at].n} 카드에 올려 찾아보자 (30분).`); }
+  if (isRelic(card)) {
+    const c = cOf(card);
+    $('#sheet').dataset.modal = '';
+    sheet(`<h2>${crewTr(c)[0]} ${crewTr(c)[1]}</h2><p class="endtxt">${S.ship === 'cargo' && c.relic2 ? c.relic2 : c.relic}</p><p class="muted">⚓ 선원 명부에 '${c.n}'의 흐린 기록이 남았다.</p><div class="btns"><button class="pri" data-act="keepStory" data-id="${card.id}">챙기기</button></div>`);
+    return true;
+  }
+  const j = JOURNAL.find(x => x.id === card.k);
+  if (j) {
+    $('#sheet').dataset.modal = '';
+    sheet(`<h2>📔 ${j.title}</h2><p class="endtxt">${j.txt}</p><p class="muted">📖 도감 → 이야기에 보관된다. 다음 삶에도 남는다.</p><div class="btns"><button class="pri" data-act="keepStory" data-id="${card.id}">보관하기</button></div>`);
+    return true;
+  }
+  return false;
+}
+function showMate(m) {
+  const c = cOf(m), i = sIdx(), [need, what] = c.learn[i], ab = c.ab[i];
+  $('#sheet').dataset.modal = '';
+  sheet(`<h2>${c.e} ${c.n} <span class="muted">${c.role[i]}</span></h2>
+    <p>${c.pers}</p>
+    <p>포만감 <b>${Math.round(m.h)}</b> · 수분 <b>${Math.round(m.w)}</b> · 일: <b>${JOBNM[m.job] || '없음'}</b> (오늘 ${m.workH || 0}/8시간)<br>
+    <span class="muted">음식·물 카드를 올려 먹여요. 20 이하면 일하지 않고, 0인 채 24시간이면 떠나요. 밤(18~06시)과 폭풍에는 기지에서 쉬어요.</span></p>
+    <p>잘하는 일: ${c.job[i]}</p>
+    <p>✦ 선장이 배우기: <b>${ab[0]}</b> — ${ab[1]}<br>${L_(c.id) ? '배움 완료 (이번 삶에서만)' : `${what} ${S.lc[c.id] || 0}/${need} (이 선원이 곁에 있을 때)`}</p>
+    <div class="btns"><button data-act="mateBase" data-id="${m.id}">🏕️ 기지로 보내기</button><button class="pri" data-close>닫기</button></div>`);
+}
+/* --- 오프닝 --- */
+let introT = [];
+function showIntro() {
+  const el = $('#intro'); el.hidden = false; el.dataset.at = performance.now();
+  const ls = el.querySelectorAll('.ln'); ls.forEach(x => x.classList.remove('on')); el.querySelector('.hint').classList.remove('on');
+  SND.ensure(); setTimeout(() => SND.play('wave'), 50);
+  introT.forEach(clearTimeout); introT = [];
+  ls.forEach((x, i) => introT.push(setTimeout(() => x.classList.add('on'), 2000 + i * 1000)));
+  introT.push(setTimeout(() => el.querySelector('.hint').classList.add('on'), 2000 + ls.length * 1000));
+}
+function closeIntro() {
+  const el = $('#intro'); if (el.hidden) return;
+  if (performance.now() - (+el.dataset.at || 0) < 350) return;
+  introT.forEach(clearTimeout); el.hidden = true;
+  if (!meta.seenHelp) showHelp(); else toast('🏖️ 해변을 탭해 보세요. 선원 일곱 명이 섬 어딘가에 있다.');
+}
+$('#intro').addEventListener('pointerup', closeIntro);
+/* --- 도감 탭: 명부·이야기 --- */
+function rosterHTML() {
+  return `<p class="muted">한 번이라도 구조하면 선명한 기록, 구조나 탈출로 함께 섬을 떠나면 ⛵ 귀환 기록. 집으로 보낸 선원 ${homeN()}/7</p>` + CREW.map(c => {
+    const r = meta.roster[c.id] || {};
+    if (!r.seen) return `<div class="rcp unk"><span class="e">${c.e}</span><div><b>???</b><small>아직 만나지 못한 선원</small></div></div>`;
+    if (!r.met) return `<div class="rcp"><span class="e dim">${c.tr[0]}</span><div><b>${c.n}</b> <span class="muted">흐린 기록</span><small>${c.relic}</small></div></div>`;
+    return `<div class="rcp"><span class="e">${c.e}</span><div><b>${c.n}</b> ${r.home ? '⛵' : ''} <span class="muted">${c.role[0]} / ${c.role[1]}</span><small>${c.pers} · ${c.line}<br>배울 수 있는 것: ${c.ab[0][0]} / ${c.ab[1][0]}</small></div></div>`;
+  }).join('');
+}
+function storyHTML() {
+  const got = JOURNAL.filter(j => meta.pieces[j.id]);
+  const ends = Object.entries(meta.endings || {});
+  return `<h3>📔 항해일지 ${got.length}/${JOURNAL.length}</h3>${got.map(j => `<div class="rcp"><span class="e">📔</span><div><b>${j.title}</b><small>${j.txt}</small></div></div>`).join('') || '<p class="muted">아직 찾은 일지가 없어요.</p>'}
+    <h3>🏁 엔딩 ${ends.length}/${homeAll() || meta.endings.stay ? 7 : 6}</h3>${Object.entries(END).filter(([id]) => id !== 'stay' || homeAll() || meta.endings.stay).map(([id, e]) => `<div class="rcp ${meta.endings[id] ? '' : 'unk'}"><span class="e">${e.i}</span><div><b>${meta.endings[id] ? e.t : '???'}</b>${meta.endings[id] ? `<small>${meta.endings[id]}번 봄</small>` : ''}</div></div>`).join('')}`;
+}
+/* --- 디버그 (?debug) --- */
+const DBG = {
+  roster() { for (const c of CREW) { const r = rosterOf(c.id); r.seen = r.met = r.home = 1; } saveMeta(); toast('🛠 명부 7명 귀환으로 채움 (다음 삶부터 \'남는다\' 선택지)'); },
+  rosterClear() { meta.roster = {}; meta.endings = {}; meta.endMethod = {}; meta.storyLives = 0; saveMeta(); toast('🛠 명부·엔딩 기록 비움'); },
+  traces() { if (!S.crew) return toast('이야기 삶이 아니에요 (배를 고르고 시작한 삶에서만)'); for (const c of CREW) if (!S.crew.st[c.id]) { S.crew.st[c.id] = 'trace'; spawnNear(mk('cx_' + c.id), placeSt(c.at)); } after(); toast('🛠 남은 흔적 카드를 모두 꺼냄'); },
+  signal() { if (!findKind('signal')) spawnNear(mk('signal'), placeSt('base')); S.ships = 3; if (!usableTorch()) spawnNear(mk('torch'), placeSt('base')); S.rain = false; after(); toast('🛠 신호대 + 항로 기록 3 + 횃불'); },
+  escape() {
+    const n = Math.min(mates().length, 4);
+    if (!findKind('raft') && !findKind('bigraft')) spawnNear(mk(n > 2 ? 'bigraft' : 'raft'), placeSt('base'));
+    const nd = escapeNeeds(n); for (let i = 0; i < nd.w; i++) give('rainw', placeSt('base')); for (let i = 0; i < nd.f; i++) give('fishc', placeSt('base')); S.crewGain = {};
+    const h = mod() / 60; if (h >= 12) S.t += 1440 - mod() + 420; else if (h < 6) S.t += 420 - mod();
+    S.calmDay = day(); S.storm = 0; after(); toast('🛠 뗏목·물·구운 생선, 시간 = 큰 폭풍 다음 날 아침');
+  },
+  feed() { for (const c of crewCards()) { c.h = 90; c.w = 90; c.zero = 0; } after(); },
+};
+
 /* ---------- 시작 ---------- */
 function boot() {
   measure();
   syncSndBtn();
   let run = null;
   try { run = JSON.parse(localStorage.getItem(RUN_KEY) || 'null'); } catch (e) {}
-  if (run && run.v === VERSION) {
+  if (run && run.v === VERSION && !run.pre) {
     S = run;
+    applyShipRecipes();
+    if (S.crew && !S.crewGain) S.crewGain = {};
     if (!S.st100) { S.hunger = 100 - S.hunger; S.thirst = 100 - S.thirst; S.st100 = 1; saveRun(); } // 〔v0.5〕 상태 100 기준으로 옮기기
     if (typeof S.temp !== 'number' || S.temp > 45) { S.temp = 36.5; saveRun(); }
     for (const c of allCards()) if (FAC[c.k] && c.fd === undefined) c.fd = FAC[c.k].max; // 〔v0.5 확정: 시설 내구도·보수〕 예전 시설은 내구 가득 // 〔v0.5 확정: 체온〕 예전 저장은 36.5℃로 시작
-    if (S.dead) { render(); showDeath(); return; }
+    if (S.dead) { render(); if (S.ending) showEnding(); else showDeath(); return; }
     sortBoardIfOff(); render();
-  } else { newGame(meta.unlocked.stone && meta.lastTraits ? meta.lastTraits.filter(id => meta.unlocked[id]) : [], false); render(); }
+    if (S.endPending) { endingFlow(S.endPending.type, S.endPending.crew); return; }
+    if (!S.ship && !NOINTRO) setTimeout(() => toast('이전 삶이 이어져요. 선장·선원 이야기는 다음 삶부터 (⋯ 메뉴에서 포기하면 바로 시작)'), 600);
+  } else if (NOINTRO) { newGame(meta.unlocked.stone && meta.lastTraits ? meta.lastTraits.filter(id => meta.unlocked[id]) : [], false); render(); }
+  else { newGame([], false, null, true); render(); pickTraits = (meta.lastTraits || []).filter(id => meta.unlocked[id]); pickNaked = false; showTraits(); return; }
   if (!meta.seenHelp) showHelp();
 }
 function sortBoardIfOff() { if (S.stacks.some(st => st.x + D.cw > D.W + 2)) sortBoard(true); }
-window.__game = {fi:(a, b) => fixedInteraction(a, b, stackOf(b)), snd:SND, tide:{open:() => flatOpen(), windows:tideWindows}, get S() { return S; }, get meta() { return meta; }, sortBoard, render, D, K, advance:(m) => { advance(m); after(); }};
+window.__game = {story:{CREW, mates, mateOf, crewHour, learn, endingFlow, finishEnding, DBG, showIntro, closeIntro, homeN, homeAll, pickCrew, SHIPS, END}, fi:(a, b) => fixedInteraction(a, b, stackOf(b)), snd:SND, tide:{open:() => flatOpen(), windows:tideWindows}, get S() { return S; }, get meta() { return meta; }, sortBoard, render, D, K, advance:(m) => { advance(m); after(); }};
 boot();
 </script>
 </body>
