@@ -46,7 +46,9 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
 #hud .r1{overflow:hidden}
 #field{position:relative;width:100%;min-height:100%}
 #toolbar{flex:none;display:flex;gap:6px;padding:6px 8px;background:var(--hud);touch-action:manipulation}
-#toolbar button{flex:1;min-height:44px;border:0;border-radius:12px;background:#f3e7c7;color:#1d2b2f;font-size:14px;font-weight:700;font-family:inherit;touch-action:manipulation}
+#toolbar #bHelp,#toolbar #bMenu{flex:.55}
+#toolbar #bSort{flex:.8}
+#toolbar button{flex:1;min-width:0;padding:0 2px;white-space:nowrap;letter-spacing:-.3px;min-height:44px;border:0;border-radius:12px;background:#f3e7c7;color:#1d2b2f;font-size:14px;font-weight:700;font-family:inherit;touch-action:manipulation}
 #toolbar button:active{transform:scale(.96)}
 #toolbar button.pri{background:#ffd36b}
 .card{position:absolute;left:0;top:0;width:var(--cw);height:var(--ch);touch-action:none;will-change:transform;
@@ -108,6 +110,24 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
 #sheet button.danger{background:#f3b1a6}
 .c-fac.compost{background:#d9c9a8}
 #sheet button:disabled{opacity:.4}
+#sheet .ctabs{display:flex;gap:4px;overflow-x:auto;margin:0 -4px 6px;padding:0 4px 2px;scrollbar-width:none}
+#sheet .ctabs button{flex:none;min-height:38px;padding:0 10px;font-size:14px}
+#sheet .ctabs button.on{background:#ffd36b;outline:2px solid #d9a400}
+#sheet .chead{display:flex;align-items:center;gap:8px;position:sticky;top:-16px;background:#fff8e6;z-index:2;padding:6px 0 4px;margin-top:-6px}
+#sheet .chead h2{flex:1;margin:0}
+#sheet .chead .x{min-height:40px;min-width:48px;font-size:18px}
+#sheet button.cr{display:flex;width:100%;text-align:left;gap:8px;align-items:center;padding:8px 6px;margin:0 0 5px;min-height:52px;background:#fbf1d8;border-radius:12px;font-weight:400;font-size:14px;line-height:1.35}
+#sheet button.cr .o{font-size:26px;width:34px;text-align:center;flex:none}
+#sheet button.cr .m{flex:1;min-width:0}
+#sheet button.cr .m b{font-size:15px}
+#sheet button.cr .m .q{font-size:15px;letter-spacing:.5px}
+#sheet button.cr small{display:block;color:#6b5c3c;font-size:12px}
+#sheet button.cr .s{flex:none;font-size:12px;font-weight:800;border-radius:8px;padding:2px 6px;background:#efe3c4;color:#6b5c3c;max-width:86px;text-align:center}
+#sheet button.cr.ok{background:#e2f6d8;outline:2px solid #6cc35a}
+#sheet button.cr.ok .s{background:#6cc35a;color:#fff}
+#sheet button.cr.pt .s{background:#ffe08a;color:#5a4300}
+.card.want .ci{animation:want .45s ease-in-out 7 alternate;outline:4px solid #4fd1ff;outline-offset:1px}
+@keyframes want{from{transform:none;box-shadow:0 0 0 0 rgba(79,209,255,.0)}to{transform:scale(1.08);box-shadow:0 0 0 8px rgba(79,209,255,.55)}}
 #sheet .rcp{display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid #eadfc4;font-size:14px}
 #sheet .rcp .e{font-size:24px;width:32px;text-align:center}
 #sheet .rcp.unk .e{filter:grayscale(1) brightness(.2)}
@@ -170,8 +190,9 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
   <main id="board"><div id="field"></div></main>
   <footer id="toolbar">
     <button id="bSort" class="pri">정렬</button>
+    <button id="bCraft">📜 조합표</button>
     <button id="bBook">📖 도감</button>
-    <button id="bLog">📜 기록</button>
+    <button id="bLog">🗒️ 기록</button>
     <button id="bHelp">❓</button>
     <button id="bMenu">⋯</button>
   </footer>
@@ -193,7 +214,7 @@ const RUN_KEY = 'cardIsland.run.v1', META_KEY = 'cardIsland.meta.v1';
 const K = {
   beach:{n:'해변',e:'🏖️',cat:'place'}, sea:{n:'얕은 바다',e:'🌊',cat:'place'}, jungle:{n:'정글',e:'🌴',cat:'place'},
   ledge:{n:'바위턱',e:'⛰️',cat:'place'}, base:{n:'기지',e:'🏕️',cat:'place'}, flat:{n:'갯벌',e:'🏝️',cat:'place'},
-  valley:{n:'민물 계곡',e:'🏞️',cat:'place',locked:1}, cave:{n:'동굴',e:'🕳️',cat:'place',locked:1},
+  valley:{n:'강',e:'🏞️',cat:'place'}, cave:{n:'동굴',e:'🕳️',cat:'place',locked:1},
   stone:{n:'돌',e:'🪨',cat:'res'}, stick:{n:'나뭇가지',e:'🥢',cat:'res'}, leaf:{n:'잎',e:'🍃',cat:'res'},
   fiber:{n:'섬유',e:'🌾',cat:'res'}, vine:{n:'덩굴',e:'➰',cat:'res'}, bent:{n:'휜 가지',e:'🪃',cat:'res'},
   flint:{n:'부싯돌',e:'💠',cat:'res'}, plank:{n:'떠밀려 온 나무판',sn:'나무판',e:'🟫',cat:'res'},
@@ -214,7 +235,10 @@ const K = {
   coco:{n:'코코넛',e:'🥥',cat:'food',closed:1},
   cocoo:{n:'깬 코코넛',e:'🥛',cat:'food',eat:{h:8,t:20},spoil:4320},
   rotten:{n:'상한 음식',e:'🤢',cat:'food',eat:{h:3,sick:1}},
-  rainw:{n:'고인 빗물',e:'💧',cat:'water',eat:{t:25,sick:.25}},
+  rainw:{n:'고인 빗물',e:'💧',cat:'water',eat:{t:25,sick:.25},cook:'boilw'},
+  rivw:{n:'강물',e:'🫗',cat:'water',eat:{t:25,sick:.30},cook:'boilw'}, boilw:{n:'끓인 물',e:'🍵',cat:'water',eat:{t:35}},
+  rfish:{n:'민물고기',e:'🐟',cat:'food',eat:{h:10,sick:.30},cook:'rfishc',spoil:720,raw:1}, rfishc:{n:'구운 민물고기',e:'🍢',cat:'food',eat:{h:22},spoil:1440},
+  reed:{n:'갈대',e:'🎋',cat:'res'},
   sharp:{n:'날 선 돌',e:'🔺',cat:'tool',dur:8}, knife:{n:'칼',e:'🔪',cat:'tool',dur:12},
   spear:{n:'창',e:'🔱',cat:'tool',dur:10}, rod:{n:'낚싯대',e:'🎣',cat:'tool',dur:8},
   drill:{n:'손드릴',e:'🌀',cat:'tool',dur:6}, torch:{n:'횃불',e:'🕯️',cat:'tool',dur:4},
@@ -241,6 +265,7 @@ const canDiscard = c => !FIXED.has(c.k) && !['tool','place','fac','crew'].includ
 const COMPOSTABLE = new Set(['rotten','bone','weed']);
 const COMPOST_MAX = 3, COMPOST_MIN = 1440;
 const PLACE_ORDER = ['beach','sea','flat','jungle','ledge','base'];
+const PLACE_SORT = PLACE_ORDER.concat(['valley','cave']);
 const CAT_ORDER = {fac:0, fire:1, dead:2, tool:3, food:4, water:5, res:6, place:7};
 
 /* ---------- 조합 ---------- */
@@ -254,7 +279,8 @@ const RECIPES = [
   {id:'spear', out:'spear', inp:{sharp:1, stick:1, rope:1}, t:20, e:2},
   {id:'rod', out:'rod', inp:{stick:1, rope:1, clam:1}, t:20, e:2},
   {id:'bed', out:'bed', inp:{leaf:2}, t:10, e:1, unique:['bed','windbreak'], fac:1},
-  {id:'catcher', out:'catcher', inp:{leaf:2, stick:1}, t:10, e:1, unique:['catcher'], fac:1},
+  {id:'catcher', out:'catcher', inp:{leaf:1, stick:1}, t:10, e:1, unique:['catcher'], fac:1}, // 〔물 완화〕 잎 2 → 1
+  {id:'reedrope', out:'rope', inp:{reed:2}, t:10, e:1},
   {id:'windbreak', out:'windbreak', inp:{bed:1, rope:1, stick:2}, t:40, e:5, unique:['windbreak'], up:'bed'},
   {id:'fence', out:'fence', inp:{log:3}, t:90, e:5, unique:['fence','hut'], fac:1},
   {id:'hut', out:'hut', inp:{fence:1, log:2, leaf:3}, t:180, e:15, unique:['hut'], up:'fence'},
@@ -264,14 +290,16 @@ const RECIPES = [
 const BOOK = [
   ['sharp','🔺','날 선 돌','🪨 돌 + 🪨 돌'],
   ['rope','🧶','노끈','🌾 섬유 + 🌾 섬유 (덩굴 ➰ 1개는 노끈 대신 쓸 수 있음)'],
+  ['reedrope','🧶','노끈 (갈대)','🎋 갈대 + 🎋 갈대 · 🏞️ 강에서 나옴'],
   ['drill','🌀','손드릴','🥢 나뭇가지 + 🥢 나뭇가지'],
   ['ember','✨','불씨','🌀 손드릴(도구) + 🌾 섬유 · 성공 70% (비 40%) · 30분 안에 써야 함','drill'],
   ['campfire','🔥','모닥불','✨ 불씨 + 🥢 나뭇가지 · 연료 8시간','ember'],
   ['fuel','🔥','모닥불 연료','🥢 나뭇가지(+4시간) / 🪵 통나무(+12시간) → 🔥 모닥불 (최대 24시간)','campfire'],
   ['relightfire','🔥','모닥불 다시 피우기','✨ 불씨 → 🌫️ 꺼진 모닥불','campfire'],
   ['torch','🕯️','횃불','🥢 나뭇가지 + 🌾 섬유 + ✨ 불씨 · 내구 4 (밤 살피기 1회당 −1)','ember'],
+  ['torchfire','🕯️','횃불 (모닥불에서)','🥢 나뭇가지 + 🌾 섬유 더미 → 🔥 모닥불 · 불씨 없이 10분','campfire'],
   ['relight','🕯️','횃불 다시 붙이기','꺼진 횃불 → 🔥 모닥불 · 불씨 없이 내구 4','torch'],
-  ['opencoco','🥛','코코넛 열기','🔺 날 선 돌 / 🔪 칼 → 🥥 코코넛','sharp'],
+  ['opencoco','🥛','코코넛 열기','🪨 돌(20분, 돌은 남음) / 🔺 날 선 돌 / 🔪 칼(10분) → 🥥 코코넛 · 수분 +20'],
   ['knife','🔪','칼','🔺 날 선 돌 + 💠 부싯돌 + 🥢 나뭇가지','sharp'],
   ['spear','🔱','창','🔺 날 선 돌 + 🥢 나뭇가지 + 🧶 노끈','sharp'],
   ['rod','🎣','낚싯대','🥢 나뭇가지 + 🧶 노끈 + 🐚 조개','rope'],
@@ -286,13 +314,16 @@ const BOOK = [
   ['cook_fishc','🍢','구운 생선','🐟 생선 → 🔥 모닥불 (20분)','campfire'],
   ['cook_fishkc','🍱','손질 생선구이','🐠 손질한 생선 → 🔥 모닥불 (20분)','cleanfish'],
   ['cook_eggc','🍳','구운 새알','🥚 새알 → 🔥 모닥불 (20분)','campfire'],
+  ['cook_rfishc','🍢','구운 민물고기','🐟 민물고기 → 🔥 모닥불 (20분)','campfire'],
+  ['cook_boilw','🍵','끓인 물','🫗 강물 / 💧 고인 빗물 → 🔥 모닥불 (20분) · 배탈 없음, 수분 +35','campfire'],
   ['bed','🛏️','침상','🍃 잎 ×2 더미 → 🏕️ 기지에 올리기 · 쉬기 기운 +8/시간 · 내구 9 (🍃 잎으로 보수)'],
-  ['catcher','🪣','빗물 받이','🍃 잎 ×2 + 🥢 나뭇가지 더미 → 🏕️ 기지에 올리기 · 비 2시간마다 물 1잔 (최대 3) · 내구 10'],
+  ['catcher','🪣','빗물 받이','🍃 잎 + 🥢 나뭇가지 더미 → 🏕️ 기지에 올리기 · 비 오면 1시간마다 1잔, 맑아도 아침 이슬 1잔 (최대 4) · 내구 10'],
   ['windbreak','⛺','바람막이','🛏️ 침상 위에 🧶 노끈 + 🥢 나뭇가지 ×2 (또는 그 더미를 🏕️ 기지에) · 쉬기 +9, 비 피해 절반, 비에 몸이 안 식음, 폭풍 피해 줄임 · 내구 20 (🍃·🥢·🧶로 보수)','bed'],
   ['fence','🚧','울타리','🪵 통나무 ×3 더미 → 🏕️ 기지에 올리기 · 밤짐승 차단 · 내구 30 (🪵로 보수)','chop'],
   ['hut','🛖','오두막','🚧 울타리 위에 🪵 통나무 ×2 + 🍃 잎 ×3 (또는 그 더미를 🏕️ 기지에) · 폭풍 차단, 쉬기 +12, 밤 추위 막음, 안에서 쉬면 몸이 데워짐 · 내구 40 (🪵·🍃로 보수)','fence'],
   ['compost','🪱','퇴비 더미','🥢 나뭇가지 ×2 + 🍃 잎 ×2 더미 → 🏕️ 기지에 올리기 · 상한 음식 처리'],
   ['humus','🟤','퇴비','🤢 상한 음식 / 🦴 생선뼈 / 🌱 해초 → 🪱 퇴비 더미 · 24시간 뒤 (최대 3개 동시) · 농사용(다음 빌드)','compost'],
+  ['river','🏞️','강 (민물)','🌴 정글 탐사 50%에 열림 · 살피면 🫗 강물·🐟 민물고기·🎋 갈대·🪨 돌 · 강물은 끓여 마시면 안전'],
   ['discard','🌊','버리기','필요 없는 카드 → 🌊 얕은 바다 (도구·장소·시설 제외) · 상한 음식·생선뼈는 가끔 게를 부름'],
 ];
 const BOOK_IDS = new Set(BOOK.map(b => b[0]));
@@ -310,24 +341,26 @@ const TRAITS = [
 
 /* ---------- 장소 테이블 (13장) ---------- */
 function dropTable(k) {
-  if (k === 'beach') return [['stone',25,'shore'],['stick',25,'shore'],['clam',20,'shore'],['crab',8,'shore'],['plank',4,'shore']];
+  if (k === 'beach') return [['stone',25,'shore'],['stick',25,'shore'],['clam',20,'shore'],['crab',8,'shore'],['plank',4,'shore'],['coco',12,'palm']];
   if (k === 'sea') return [['weed',30,'weed']];
   if (k === 'flat') return [['clam',40,'all'],['crab',25,'all'],['bigclam',L_('dal') && S.ship === 'fish' ? 25 : 15,'all']];
-  if (k === 'jungle') return [['leaf',25,'veg'],['fiber',25,'veg'],['stick',20,'veg'],['coco',12,'coco'],['vine',8,'veg'],['bent',5,'veg']];
+  if (k === 'jungle') return [['leaf',22,'veg'],['fiber',22,'veg'],['stick',18,'veg'],['coco',24,'coco'],['vine',8,'veg'],['bent',5,'veg']];
+  if (k === 'valley') return [['rivw',40,'water'],['rfish',15,'rfish'],['stone',12,'bank'],['reed',15,'bank'],['clam',6,'bank']];
   if (k === 'ledge') return S.rain ? [['stone',30,'rock'],['flint',25,'rock'],['egg',10,'egg'],['rainw',25,'rainw']]
-                                   : [['stone',30,'rock'],['flint',25,'rock'],['egg',10,'egg'],['rainw',10,'rainw']];
+                                   : [['stone',28,'rock'],['flint',22,'rock'],['egg',10,'egg'],['rainw',18,'rainw']];
   return [];
 }
 function initPools() {
   return {
-    beach:{exp:0, pools:{shore:[20,20]}},
+    beach:{exp:0, pools:{shore:[20,20], palm:[5,5]}},
     sea:{exp:0, pools:{weed:[8,8], fish:[12,12]}},
     flat:{exp:0, pools:{all:[10,10]}},
-    jungle:{exp:0, pools:{veg:[40,40], coco:[6,6], log:[12,12]}},
-    ledge:{exp:0, pools:{rock:[25,25], egg:[3,3], rainw:[3,3]}},
+    jungle:{exp:0, pools:{veg:[40,40], coco:[10,10], log:[12,12]}},
+    ledge:{exp:0, pools:{rock:[25,25], egg:[3,3], rainw:[4,4]}},
+    valley:{exp:0, pools:{water:[10,10], rfish:[6,6], bank:[12,12]}},
   };
 }
-const REGEN = {sea:{weed:3, fish:6}, jungle:{veg:12, coco:2, log:1}, ledge:{rock:3, egg:1}};
+const REGEN = {beach:{palm:2}, sea:{weed:3, fish:6}, jungle:{veg:12, coco:4, log:1}, ledge:{rock:3, egg:1, rainw:1}, valley:{water:10, rfish:3, bank:4}}; // 〔물 완화〕 야자·바위턱 웅덩이·강
 
 /* ---------- 상태 ---------- */
 let S = null;
@@ -374,7 +407,7 @@ function newGame(traits, naked, ship, pre) {
   applyShipRecipes();
   if (ship === 'fish') S.places.sea.pools.fish = [16, 16];
   for (const k of PLACE_ORDER) addStack([mk(k)], 0, 0);
-  addStack([mk('coco')], 0, 0);
+  addStack([mk('coco')], 0, 0); addStack([mk('cocoo')], 0, 0); addStack([mk('rainw')], 0, 0); // 〔물 완화〕 시작 물 2
   if (hasTrait('stone')) addStack([mk('sharp')], 0, 0);
   if (hasTrait('map')) for (const k of ['beach','sea','jungle','ledge']) S.places[k].exp = 30;
   sortBoard(true);
@@ -515,9 +548,10 @@ function tempMsg(b0) {
 function heatUp(v, why) { const b0 = tband(); S.temp = clamp(S.temp + v, 28, 43); say(why, 'bad'); tempMsg(b0); }
 function coolDrink() { if (S.temp > TEMP_N) { const b0 = tband(); S.temp = Math.max(TEMP_N, S.temp - .3); tempMsg(b0); return ' 열 −0.3℃'; } return ''; }
 // 〔난이도 완화〕 시간당 감소량 (깨어 있음 / 쉬는 중), 첫 며칠은 더 너그럽게
-const RATE = {h:3, hs:1.5, w:4, ws:1.5};
+const RATE = {h:3, hs:1.5, w:3.5, ws:1.5};
 const FUEL = {start:480, max:1440, stick:240, plank:240, log:720};
 const easy = (d = day()) => d <= 3 ? .7 : d <= 5 ? .85 : 1;
+const easyW = (d = day()) => d <= 3 ? .6 : d <= 5 ? .8 : 1; // 수분은 초반에 더 너그럽게
 function advance(min, mode = 'awake') {
   const rest = mode === 'rest';
   for (let i = 0; i < min && !S.dead && !S.pendingEnd; i++) {
@@ -527,7 +561,7 @@ function advance(min, mode = 'awake') {
     // 〔v0.5 확정: 상태 100 기준〕 hunger = 포만감, thirst = 수분 (100 = 가득, 시간이 지나면 줄어듦, 0이면 체력 감소)
     const ez = easy();
     S.hunger = clamp(S.hunger - (sleepy ? RATE.hs : RATE.h) * ez / 60);
-    let th = (sleepy ? RATE.ws : RATE.w) * ez / 60;
+    let th = (sleepy ? RATE.ws : RATE.w) * easyW() / 60;
     const tb = tband().i; // 미열 수분 감소 +30%, 고열 이상 +60%
     if (tb === 4) th *= 1.3; else if (tb >= 5) th *= 1.6;
     if (S.sick > 0) { th *= 2; S.sick--; if (!S.sick) say('배탈이 가라앉았다.'); }
@@ -593,13 +627,13 @@ function dawn() {
   S.life.surv++;
   regenShore();
   for (const [pk, pools] of Object.entries(REGEN)) for (const [rk, v] of Object.entries(pools)) {
-    const p = S.places[pk].pools[rk]; p[0] = Math.min(p[1], p[0] + (pk === 'sea' && rk === 'fish' && S.ship === 'fish' ? 8 : v));
+    const p = S.places[pk] && S.places[pk].pools[rk]; if (!p) continue; p[0] = Math.min(p[1], p[0] + (pk === 'sea' && rk === 'fish' && S.ship === 'fish' ? 8 : v));
   }
   const d = day();
   const p = Math.min(.40, .20 + .01 * (d - 1));
   S.rain = S.nextRain !== undefined ? S.nextRain : rnd() < p; delete S.nextRain;
   S.rainStreak = S.rain ? S.rainStreak + 1 : 0;
-  if (!S.rain) { const r = S.places.ledge.pools.rainw; r[0] = Math.max(0, r[0] - 1); }
+  for (const c of allCards()) if (c.k === 'catcher' && c.water < 4) c.water++; // 아침 이슬
   say(`🌅 ${d}일차 아침. 살아남았다 (생존 ${S.life.surv}일)${S.rain ? ` — 🌧️ 비가 온다${S.rainStreak > 1 ? ` (${S.rainStreak}일째)` : ''}` : ''}`, 'good');
   if (d % 7 === 0) say('⚠️ 오늘 12:00부터 내일 06:00까지 큰 폭풍이 온다! 오두막과 비축 식량·물을 준비하자.', 'bad');
   else if (hasTrait('stormsense') && (d + 1) % 7 === 0) say('⚠️ (폭풍 감각) 내일 12:00 큰 폭풍이 온다.', 'bad');
@@ -608,7 +642,7 @@ function dawn() {
 function rainHour(m) {
   for (const st of S.stacks) for (const c of st.cards) {
     if (c.k === 'fire' && rnd() < (S.crew && mates().some(x => x.job === 'fire' && x.h > 20 && x.w > 20) ? .05 : .25)) extinguish(c, st, '비에 젖어서');
-    if (m % 120 === 0 && c.k === 'catcher' && c.water < 3 && !S.storm) c.water++;
+    if (c.k === 'catcher' && c.water < 4 && !S.storm) c.water++; // 〔물 완화〕 1시간마다, 최대 4
   }
   if (m % 120 === 0) { const r = S.places.ledge.pools.rainw; r[0] = Math.min(r[1], r[0] + 1); }
 }
@@ -661,7 +695,7 @@ function discover(id) {
   if (!BOOK_IDS.has(id) || meta.discovered[id]) return;
   meta.discovered[id] = 1; S.life.newRecipes.push(id); saveMeta(); SND.q('discover');
   const b = BOOK.find(x => x[0] === id);
-  pending.push([`📖 새 조합 발견! ${b[1]} ${b[2]}`, 'disc']);
+  pending.push([`📖 처음 만들어 봄! ${b[1]} ${b[2]}`, 'disc']);
 }
 function appear(tid) {
   if (meta.appeared[tid]) return;
@@ -704,7 +738,7 @@ function explore(card) {
   if (!canAct(1)) return;
   const st = stackOf(card);
   act(30, night ? 5 : 3, () => {
-    SND.q('explore_' + k);
+    SND.q('explore_' + (k === 'valley' ? 'sea' : k));
     if (torch) wear(torch);
     if (night) appear('nighteye');
     const P = S.places[k];
@@ -713,6 +747,7 @@ function explore(card) {
       if (before < 100 && P.exp >= 100) { say(`🗺️ ${K[k].n} 탐사 100%!`, 'good'); appear('map'); learn('yun'); }
     }
     if (k === 'flat') S.flatN = (S.flatN || 0) + 1;
+    if (k === 'valley') discover('river');
     if (S.crew) { learn('kong'); if (k === 'flat' && S.ship === 'fish') learn('dal'); }
     if (S.storm) { dmg(10, '폭풍'); SND.q('hurt'); say('⛈️ 폭풍 속에서는 아무것도 찾지 못했다. 체력 −10', 'bad'); return; }
     if (!S.rain && !night && S.thirst <= 20) heatUp(.3, '🥵 목이 탄 채 뙤약볕 아래를 돌아다녔다. 체온 +0.3℃');
@@ -737,7 +772,8 @@ function explore(card) {
   });
 }
 function checkPlaces() {
-  if (S.places.jungle.exp >= 100 && !S.flags.valley) { S.flags.valley = 1; newPlace('valley', 'jungle'); }
+  if (S.places.jungle.exp >= 35 && !S.flags.wsound && !S.flags.valley) { S.flags.wsound = 1; say('💧 정글 깊은 곳에서 물소리가 들린다… (탐사 50%면 길이 열려요)', 'disc'); }
+  if (S.places.jungle.exp >= 50 && !S.flags.valley) { S.flags.valley = 1; if (!allCards().some(c => c.k === 'valley')) newPlace('valley', 'jungle'); }
   if (S.places.ledge.exp >= 100 && !S.flags.cave && allCards().some(c => c.k === 'torch' || c.k === 'torchx')) { S.flags.cave = 1; newPlace('cave', 'ledge'); }
 }
 function newPlace(k, from) {
@@ -745,7 +781,7 @@ function newPlace(k, from) {
   spawnNear(mk(k), src);
   let extra = '';
   if (!meta.places[k]) { meta.places[k] = 1; S.life.newPlaces.push(k); saveMeta(); extra = ' (첫 발견 +2 각인)'; }
-  say(`🗺️ 새 장소 발견: ${K[k].e} ${K[k].n}${extra} — 프로토타입에서는 아직 들어갈 수 없음`, 'disc');
+  say(`🗺️ 새 장소 발견: ${K[k].e} ${K[k].n}${extra}${K[k].locked ? ' — 프로토타입에서는 아직 들어갈 수 없음' : k === 'valley' ? ' — 강물·민물고기·갈대 (강물은 🔥에 끓여 마셔요)' : ''}`, 'disc');
 }
 
 function eat(card) {
@@ -757,6 +793,7 @@ function eat(card) {
   removeCards([card]);
   act(5, 0, () => {
     if (S.tut && COOKED.has(card.k)) S.tut.ev.eat = 1;
+    if (S.tut && card.k === 'cocoo') S.tut.ev.drink = 1;
     SND.q(d.cat === 'water' ? 'drink' : 'eat');
     const hh = (d.eat.h || 0) + (L_('sot') && COOKED.has(card.k) ? 5 : 0);
     if (hh) S.hunger = clamp(S.hunger + hh);
@@ -766,7 +803,7 @@ function eat(card) {
   });
 }
 function drinkCatcher(card) {
-  if (!card.water) return toast('🪣 빗물 받이가 비어 있어요. 비가 오면 2시간마다 1잔씩 찹니다.');
+  if (!card.water) return toast('🪣 비어 있어요. 비가 오면 1시간마다 1잔, 맑아도 아침마다 이슬 1잔이 찹니다.');
   card.water--;
   act(5, 0, () => { SND.q('drink'); S.thirst = clamp(S.thirst + 25); say('🪣 빗물을 마셨다. 수분 +25' + coolDrink()); });
 }
@@ -786,7 +823,7 @@ function openRest() {
   const tr = tempRate(true), tb = tband();
   sheet(`<h2>🏕️ 기지에서 쉬기</h2>
     <p>자리: <b>${rr.nm}</b> (기운 +${rr.r}/시간${mult.length ? ', ' + mult.join(', ') : ''})<br>
-    <span class="muted">쉬는 동안 포만감 −2, 수분 −2 /시간. 포만감·수분 둘 다 30 초과면 체력 +2/시간.</span><br>
+    <span class="muted">쉬는 동안 포만감 −${+(RATE.hs * easy()).toFixed(2)}, 수분 −${+(RATE.ws * easyW()).toFixed(2)} /시간. 포만감·수분 둘 다 30 초과면 체력 +2/시간.</span><br>
     🌡️ 체온 ${S.temp.toFixed(1)}℃ ${tb.nm} → 쉬는 동안 ${Math.abs(tr.net) < .005 ? '그대로' : (tr.net > 0 ? '+' : '−') + Math.abs(tr.net).toFixed(2) + '℃/시간'}${tr.net > 0 && S.temp < TEMP_N && !tr.fever ? ' (36.5까지)' : ''}<br>
     <span class="muted">몸을 데우는 것: 🔥 모닥불, 🛖 오두막에서 쉬기, 맑은 낮. 식히는 것: 비, 밤 바깥, 폭풍. 열은 쉬면서 물을 마시면 내려요.</span></p>
     <div class="btns">
@@ -842,7 +879,7 @@ function fixedInteraction(a, b, bst) {
   if (bk === 'fire') {
     if (K[ak].cook) {
       if (b.cook) return {msg:'🔥 이미 굽는 중이에요 (모닥불 조리 1개).'};
-      return {run:() => { removeCards([a]); b.cook = {k:ak, until:S.t + 20}; SND.q('stack'); learn('sot'); say(`${K[ak].e} ${K[ak].n}을(를) 불에 올렸다. 20분 뒤 익음 (다른 행동·쉬기로 시간이 흘러야 함)`); after(); }};
+      return {run:() => { removeCards([a]); b.cook = {k:ak, until:S.t + 20}; SND.q('stack'); learn('sot'); say(`${K[ak].e} ${K[ak].n}을(를) 불에 올렸다. 20분 뒤 ${K[ak].cat === 'water' ? '끓음' : '익음'} (다른 행동·쉬기로 시간이 흘러야 함)`); after(); }};
     }
     if (ak === 'stick' || ak === 'plank' || ak === 'log') {
       return {run:() => { const add = FUEL[ak]; removeCards([a]); b.fuel = Math.min(FUEL.max, b.fuel + add); discover('fuel'); if (S.tut) S.tut.ev.fuel = 1; SND.q('fuel'); say(`🔥 연료 +${add / 60}시간 (남은 연료 ${fmtH(b.fuel)})`); after(); }};
@@ -889,7 +926,9 @@ function fixedInteraction(a, b, bst) {
 function toolPair(tool, item, ist) {
   const tk = tool.k, ik = item.k;
   if ((tk === 'sharp' || tk === 'knife') && ik === 'coco')
-    return {e:0, run:() => { removeCards([item]); act(10, 0, () => { wear(tool); SND.q('chop'); spawnAt(mk('cocoo'), ist); discover('opencoco'); say('🥥 코코넛을 깼다.'); }); }};
+    return {e:0, run:() => { removeCards([item]); act(10, 0, () => { wear(tool); SND.q('chop'); spawnAt(mk('cocoo'), ist); discover('opencoco'); if (S.tut) S.tut.ev.open = 1; say('🥥 코코넛을 깼다.'); }); }};
+  if (tk === 'stone' && ik === 'coco') // 〔물 완화〕 도구 없이 돌로 깨기 (돌은 남음, 20분)
+    return {e:1, run:() => { removeCards([item]); act(20, 1, () => { SND.q('chop'); spawnAt(mk('cocoo'), ist); discover('opencoco'); if (S.tut) S.tut.ev.open = 1; say('🥥 돌로 내리쳐 코코넛을 깼다.'); }); }};
   if (tk === 'drill' && ik === 'fiber')
     return {e:3, run:() => act(20, 3, () => {
       wear(tool);
@@ -940,6 +979,13 @@ function handleDrop(drag, target, pos) {
   if (T.cards.length === 1 && tRoot.k === 'base') return baseDrop(moving, src, drag.idx, T);
   if (T.cards.length === 1 && tRoot.k === 'sea' && a.k !== 'spear' && a.k !== 'rod' && moving.every(canDiscard)) return discard(moving, src, drag.idx);
   if (T.cards.length === 1 && tRoot.k === 'compost' && moving.every(c => COMPOSTABLE.has(c.k))) return compostAdd(moving, src, drag.idx, tRoot);
+  // 🥢+🌾 더미 → 🔥 모닥불 = 횃불 (불씨 없이)
+  if (tRoot.k === 'fire' && T.cards.length === 1 && moving.length === 2 && eqCounts(counts(moving), {stick:1, fiber:1})) {
+    if (!canAct(1)) return render();
+    takeOut(src, drag.idx);
+    act(10, 1, () => { spawnNear(mk('torch'), T); discover('torchfire'); SND.q('ignite'); say('🕯️ 모닥불에 붙여 횃불을 만들었다 (10분, 불씨 없이).', 'good'); });
+    return;
+  }
   // 1) 고정 카드 위
   if (FIXED.has(tRoot.k) && T.cards.length === 1) {
     const r = fixedInteraction(a, tRoot, T);
@@ -1086,11 +1132,11 @@ function sortBoard(silent) {
   const places = [], fixed = [], mixed = [], byKind = {};
   for (const st of S.stacks) {
     const k0 = st.cards[0].k;
-    if (st.cards.length === 1 && FIXED.has(k0)) (PLACE_ORDER.includes(k0) ? places : fixed).push(st);
+    if (st.cards.length === 1 && FIXED.has(k0)) (PLACE_SORT.includes(k0) ? places : fixed).push(st);
     else if (allSame(st.cards) && !FIXED.has(k0)) (byKind[k0] = byKind[k0] || []).push(...st.cards);
     else mixed.push(st);
   }
-  places.sort((a, b) => PLACE_ORDER.indexOf(a.cards[0].k) - PLACE_ORDER.indexOf(b.cards[0].k));
+  places.sort((a, b) => PLACE_SORT.indexOf(a.cards[0].k) - PLACE_SORT.indexOf(b.cards[0].k));
   fixed.sort((a, b) => KORDER.indexOf(a.cards[0].k) - KORDER.indexOf(b.cards[0].k));
   const kinds = Object.keys(byKind).sort((a, b) => (CAT_ORDER[K[a].cat] - CAT_ORDER[K[b].cat]) || (KORDER.indexOf(a) - KORDER.indexOf(b)));
   const piles = kinds.map(k => {
@@ -1160,7 +1206,7 @@ function cardInner(c, st, i) {
   else if (c.k === 'fire') { ft = `연료 ${fmtH(c.fuel)}`; bar = c.fuel / FUEL.max * 100; if (c.cook) extra = `<div class="cook">${K[c.cook.k].e}<small>${Math.max(0, c.cook.until - S.t)}분</small></div>`; }
   else if (c.k === 'firex') ft = '불씨 필요';
   else if (c.k === 'ember') ft = `${Math.max(0, c.exp - S.t)}분 뒤<br>꺼짐`;
-  else if (c.k === 'catcher') ft = `물 ${c.water}/3`;
+  else if (c.k === 'catcher') ft = `물 ${c.water}/4`;
   else if (c.k === 'bed' || c.k === 'windbreak') ft = `쉬기 +${c.k === 'bed' ? 8 : 9}`;
   else if (c.k === 'hut') ft = '폭풍 차단<br>쉬기 +12';
   else if (c.k === 'fence') ft = '밤짐승<br>차단';
@@ -1372,18 +1418,134 @@ function showBook(tab) {
   const tabs = `<div class="tabs"><button data-act="book" data-tab="rcp" class="${tab === 'rcp' ? 'on' : ''}">📖 조합</button><button data-act="book" data-tab="crew" class="${tab === 'crew' ? 'on' : ''}">⚓ 선원 명부</button><button data-act="book" data-tab="story" class="${tab === 'story' ? 'on' : ''}">📔 이야기</button></div>`;
   if (tab !== 'rcp') { $('#sheet').dataset.modal = ''; sheet(tabs + (tab === 'crew' ? `<h2>⚓ 선원 명부</h2>${rosterHTML()}` : storyHTML()) + '<div class="btns"><button data-close>닫기</button></div>'); return; }
   const known = BOOK.filter(b => meta.discovered[b[0]]);
-  const ess = BOOK.filter(b => !meta.discovered[b[0]] && ESSENTIAL.includes(b[0]));
-  const sil = BOOK.filter(b => !meta.discovered[b[0]] && !ESSENTIAL.includes(b[0]) && b[4] && meta.discovered[b[4]]);
-  const hidden = BOOK.length - known.length - sil.length - ess.length;
   $('#sheet').dataset.modal = '';
-  sheet(tabs + `<h2>📖 조합 도감 <span class="muted">${known.length}/${BOOK.length}</span></h2>
-    <p class="muted">알아낸 조합은 죽어도 남습니다. <b>🎓 기본</b> 표시는 꼭 필요한 조합이라 처음부터 보여요.</p>
-    <div class="btns" style="margin:4px 0 8px"><button data-act="tutReplay">🎓 튜토리얼 다시 보기</button></div>
-    ${known.map(b => `<div class="rcp"><span class="e">${b[1]}</span><div><b>${b[2]}</b>${ESSENTIAL.includes(b[0]) ? '<span class="tag">🎓 기본</span>' : ''}<small>${b[3]}</small></div></div>`).join('') || '<p>아직 알아낸 조합이 없어요. 카드를 겹쳐 보세요!</p>'}
-    ${ess.map(b => `<div class="rcp ess"><span class="e">${b[1]}</span><div><b>${b[2]}</b><span class="tag">🎓 기본</span> <span class="muted">아직 안 해 봄</span><small>${b[3]}</small></div></div>`).join('')}
-    ${sil.map(b => `<div class="rcp unk"><span class="e">${b[1]}</span><div><b>???</b><small>앞 단계를 만들어 본 조합 · 재료 숨김</small></div></div>`).join('')}
-    ${hidden > 0 ? `<p class="muted">아직 실루엣도 보이지 않는 조합 ${hidden}개</p>` : ''}
+  sheet(tabs + `<h2>📖 조합 도감 <span class="muted">만들어 봄 ${known.length}/${BOOK.length}</span></h2>
+    <p class="muted">모든 조합이 처음부터 보여요. <b>✅</b> = 만들어 본 조합, <b>🎓 기본</b> = 꼭 필요한 조합. 분류별로 보고 바로 찾으려면 📜 조합표.</p>
+    <div class="btns" style="margin:4px 0 8px"><button class="pri" data-act="craft">📜 조합표 열기</button><button data-act="tutReplay">🎓 튜토리얼 다시 보기</button></div>
+    ${BOOK.map(b => { const kn = !!meta.discovered[b[0]]; return `<div class="rcp${kn ? '' : ' ess'}"><span class="e">${b[1]}</span><div><b>${b[2]}</b>${kn ? ' ✅' : ''}${ESSENTIAL.includes(b[0]) ? '<span class="tag">🎓 기본</span>' : ''}${kn ? '' : ' <span class="muted">아직 안 해 봄</span>'}<small>${b[3]}</small></div></div>`; }).join('')}
     <div class="btns"><button data-close>닫기</button></div>`);
+}
+/* ---------- 📜 조합표: 모든 조합 공개 (분류 탭 · 보드 재료 확인 · 탭하면 재료 반짝) ---------- */
+// inp: [종류 또는 [대체 종류들], 개수, 'tool'이면 소모 안 됨] · on: 올리는 곳 · t: 분 · id: 도감 id(만들어 봄 표시)
+const CT_CATS = [['now','⭐ 지금'],['tool','🔨 도구'],['fire','🔥 불·요리'],['water','💧 물'],['fac','🏕️ 시설·보수'],['use','🧭 채집·사용'],['go','🚢 선원·떠나기']];
+const CT = [
+  {c:'tool', id:'sharp', o:'sharp', inp:[['stone',2]], t:10, n:'카드 위에 같은 카드 · 더미면 맨 위를 집어 더미에 다시'},
+  {c:'tool', id:'rope', o:'rope', inp:[['fiber',2]], t:10, n:'➰ 덩굴 1장은 노끈 대신 쓸 수 있음'},
+  {c:'tool', id:'reedrope', o:'rope', inp:[['reed',2]], t:10, n:'🎋 갈대는 🏞️ 강에서'},
+  {c:'tool', id:'drill', o:'drill', inp:[['stick',2]], t:10, n:'한 번에 1개만'},
+  {c:'tool', id:'knife', o:'knife', inp:[['sharp',1],['flint',1],['stick',1]], t:20, n:'내구 12 · 손질·벌목·코코넛'},
+  {c:'tool', id:'spear', o:'spear', inp:[['sharp',1],['stick',1],[['rope','vine'],1]], t:20, n:'🌊 얕은 바다에서 창 낚시'},
+  {c:'tool', id:'rod', o:'rod', inp:[['stick',1],[['rope','vine'],1],['clam',1]], t:20, n:'🌊 얕은 바다에서 낚시 (70%)'},
+  {c:'tool', id:'torch', o:'torch', inp:[['stick',1],['fiber',1],['ember',1]], t:20, n:'밤 살피기 · 동굴 · 신호 연기'},
+  {c:'tool', id:'torchfire', o:'torch', inp:[['stick',1],['fiber',1]], on:'fire', t:10, n:'🥢+🌾를 한 더미로 쌓아 🔥 위에 · 불씨 필요 없음'},
+  {c:'tool', id:'relight', o:'torch', inp:[['torchx',1]], on:'fire', t:5, n:'꺼진 횃불 다시 붙이기 (내구 4)'},
+  {c:'fire', id:'ember', o:'ember', inp:[['drill',1,'tool'],['fiber',1]], t:20, n:'성공 70% (비 40%) · 30분 안에 써야 함'},
+  {c:'fire', id:'campfire', o:'fire', inp:[['ember',1],['stick',1]], t:10, n:'연료 8시간'},
+  {c:'fire', id:'fuel', o:['🔥','모닥불 연료'], inp:[[['stick','plank','log'],1]], on:'fire', t:0, n:'🥢·🟫 +4시간, 🪵 +12시간 (최대 24시간)'},
+  {c:'fire', id:'relightfire', o:['🔥','모닥불 다시 피우기'], inp:[['ember',1]], on:'firex', t:10, n:'꺼진 모닥불에 불씨'},
+  {c:'fire', id:'cook_clamc', o:'clamc', inp:[['clam',1]], on:'fire', t:20},
+  {c:'fire', id:'cook_crabc', o:'crabc', inp:[['crab',1]], on:'fire', t:20},
+  {c:'fire', id:'cook_fishc', o:'fishc', inp:[['fish',1]], on:'fire', t:20},
+  {c:'fire', id:'cook_rfishc', o:'rfishc', inp:[['rfish',1]], on:'fire', t:20, n:'🐟 민물고기는 🏞️ 강에서'},
+  {c:'fire', id:'cook_eggc', o:'eggc', inp:[['egg',1]], on:'fire', t:20},
+  {c:'fire', id:'cook_fishkc', o:'fishkc', inp:[['fishk',1]], on:'fire', t:20},
+  {c:'fire', id:'cook_crabkc', o:'crabkc', inp:[['crabk',1]], on:'fire', t:20},
+  {c:'fire', id:'cleanfish', o:'fishk', inp:[['knife',1,'tool'],['fish',1]], t:10, n:'생선뼈 1 · 어선은 🔺 날 선 돌로도'},
+  {c:'fire', id:'cleancrab', o:'crabk', inp:[['knife',1,'tool'],['crab',1]], t:10},
+  {c:'water', id:'opencoco', o:'cocoo', inp:[[['stone','sharp','knife'],1,'tool'],['coco',1]], t:10, n:'🪨 돌은 20분, 도구 없이 OK · 수분 +20 포만감 +8'},
+  {c:'water', id:'cook_boilw', o:'boilw', inp:[[['rivw','rainw'],1]], on:'fire', t:20, n:'배탈 없음 · 수분 +35'},
+  {c:'water', id:'catcher', o:'catcher', inp:[['leaf',1],['stick',1]], on:'base', t:10, n:'한 더미로 → 🏕️ 기지 · 비 1시간마다 1잔, 아침 이슬 1잔 (최대 4)'},
+  {c:'water', id:null, o:['🪣','빗물 받이 물 마시기'], inp:[['catcher',1]], t:5, n:'🪣 빗물 받이 탭 · 수분 +25, 배탈 없음'},
+  {c:'water', id:'river', o:['🏞️','강 살피기'], inp:[['valley',1]], t:30, n:'🌴 정글 탐사 50%에 열림 · 🫗 강물·🐟 민물고기·🎋 갈대·🪨 돌'},
+  {c:'water', id:null, o:['💧','바위턱 웅덩이'], inp:[['ledge',1]], t:30, n:'⛰️ 바위턱 살피기 → 💧 고인 빗물 (비 오면 더 많이) · 그냥 마시면 배탈 25%'},
+  {c:'fac', id:'bed', o:'bed', inp:[['leaf',2]], on:'base', t:10, n:'한 더미로 → 🏕️ 기지 · 쉬기 기운 +8/시간'},
+  {c:'fac', id:'catcher', o:'catcher', inp:[['leaf',1],['stick',1]], on:'base', t:10, n:'한 더미로 → 🏕️ 기지'},
+  {c:'fac', id:'windbreak', o:'windbreak', inp:[['bed',1],['rope',1],['stick',2]], t:40, n:'🛏️ 침상 위에 🧶+🥢🥢 (또는 더미를 🏕️에) · 비·폭풍 피해 줄임'},
+  {c:'fac', id:'fence', o:'fence', inp:[['log',3]], on:'base', t:90, n:'한 더미로 → 🏕️ 기지 · 밤짐승 차단'},
+  {c:'fac', id:'hut', o:'hut', inp:[['fence',1],['log',2],['leaf',3]], t:180, n:'🚧 울타리 위에 (또는 더미를 🏕️에) · 폭풍 차단, 쉬기 +12'},
+  {c:'fac', id:'compost', o:'compost', inp:[['stick',2],['leaf',2]], on:'base', t:20, n:'한 더미로 → 🏕️ 기지'},
+  {c:'fac', id:'humus', o:'humus', inp:[[['rotten','bone','weed'],1]], on:'compost', t:1440, n:'최대 3개 동시'},
+  {c:'fac', id:null, o:['🔨','침상 보수'], inp:[['leaf',1]], on:'bed', t:20, n:'🍃 +3 (폭풍 중 40분)'},
+  {c:'fac', id:null, o:['🔨','바람막이 보수'], inp:[[['leaf','stick','rope','vine'],1]], on:'windbreak', t:20, n:'🍃 +5, 🥢 +5, 🧶·➰ +10'},
+  {c:'fac', id:null, o:['🔨','빗물 받이 보수'], inp:[[['leaf','stick'],1]], on:'catcher', t:20, n:'🍃·🥢 +5'},
+  {c:'fac', id:null, o:['🔨','울타리 보수'], inp:[[['log','stick'],1]], on:'fence', t:20, n:'🪵 +10, 🥢 +3'},
+  {c:'fac', id:null, o:['🔨','오두막 보수'], inp:[[['log','leaf'],1]], on:'hut', t:20, n:'🪵 +10, 🍃 +4'},
+  {c:'use', id:null, o:['🔎','장소 살피기'], inp:[], t:30, n:'장소 카드 탭 · 기운 −3 (밤 −5, 횃불 필요 · 해변·갯벌은 횃불 없이)'},
+  {c:'use', id:'chop', o:'log', inp:[[['sharp','knife'],1,'tool']], on:'jungle', t:60, n:'🔺 60분 / 🔪 40분'},
+  {c:'use', id:'fish_spear', o:'fish', inp:[['spear',1,'tool']], on:'sea', t:30, n:'60% · 기운 −10'},
+  {c:'use', id:'fish_rod', o:'fish', inp:[['rod',1,'tool']], on:'sea', t:60, n:'70% · 기운 −4'},
+  {c:'use', id:'discard', o:['🌊','버리기'], inp:[], on:'sea', t:0, n:'필요 없는 카드 → 🌊 얕은 바다 (도구·장소·시설 제외)'},
+  {c:'use', id:null, o:['🏕️','쉬기·잠'], inp:[], on:'base', t:60, n:'🏕️ 기지 탭 · 밤(18~06시)엔 아침까지 잘 수 있음'},
+  {c:'go', id:'rescue', o:['👣','선원 찾기'], inp:[], t:30, n:'장소를 살피다 나온 👣 흔적 → 그 장소 카드 위'},
+  {c:'go', id:null, o:['🙌','지친 선원 → 동료'], inp:[], t:5, n:'😮‍💨 지친 선원 위에 물·음식 1장'},
+  {c:'go', id:null, o:['👥','동료에게 일 맡기기'], inp:[], t:0, n:'동료 → 장소(탐색)·🔥(불·요리)·🏕️(기지)·🗼(신호) · 한 번 맡기면 계속'},
+  {c:'go', id:'signal', o:'signal', inp:[['log',2],['leaf',4]], on:'base', t:60, n:'맑은 아침마다 지나가는 배 (항로 기록)'},
+  {c:'go', id:'smoke', o:['🟡','신호 연기'], inp:[[['torch','ember'],1]], on:'signal', t:10, n:'맑은 낮 · 항로 기록 3이면 다음 맑은 아침 구조'},
+  {c:'go', id:'raft', o:'raft', inp:[['log',4],['rope',4],['leaf',2]], on:'base', t:120, n:'한 더미로 → 🏕️ 기지 · 선장 + 2명 (운반선은 노끈 3)'},
+  {c:'go', id:'bigraft', o:'bigraft', inp:[['raft',1],['log',2],['rope',2]], t:60, n:'🛶 뗏목 위에 · 선장 + 4명'},
+  {c:'go', id:'depart', o:['🌊','출항'], inp:[[['raft','bigraft'],1]], on:'sea', t:0, n:'큰 폭풍 다음 날 06~12시 · 물 2 + 구운 음식 4 (동료 1명당 물 1 + 구운 음식 2 더)'},
+];
+const ctName = k => K[k].sn || K[k].n;
+function ctHave(ks) { const a = [].concat(ks); return allCards().filter(c => a.includes(c.k) && !(K[c.k].dur && c.dur <= 0)).length; }
+function ctState(row) {
+  if (!row.inp.length && !row.on) return {st:'na', miss:[]};
+  const miss = []; let any = false;
+  for (const [ks, n] of row.inp) { const h = ctHave(ks); if (h > 0) any = true; if (h < n) miss.push([ks, n - h]); }
+  if (row.on && !ctHave(row.on)) miss.push([row.on, 1]);
+  const total = miss.reduce((a, m) => a + m[1], 0);
+  return {st: !miss.length ? 'ok' : any ? 'pt' : 'no', miss, total};
+}
+function ctSrc(k) { // 어디서 나오는지
+  const at = []; for (const p of ['beach','sea','flat','jungle','ledge','valley']) if (dropTable(p).some(d => d[0] === k)) at.push(K[p].e);
+  return at.join('');
+}
+const ctEm = ks => [].concat(ks).map(k => K[k].e).join('/');
+function ctRowHTML(row, i) {
+  const o = Array.isArray(row.o) ? row.o : [K[row.o].e, ctName(row.o)], cs = ctState(row);
+  const q = row.inp.map(([ks, n, tl]) => `${ctEm(ks)}${n > 1 ? '×' + n : ''}${tl ? '<sup>도구</sup>' : ''}`).join(' + ');
+  const where = row.on ? `→ ${K[row.on].e}${ctName(row.on)} 위` : (row.inp.length > 1 ? '카드끼리 겹치기' : '');
+  const tt = row.t >= 60 ? (row.t % 60 ? (row.t / 60).toFixed(1) : row.t / 60) + '시간' : row.t ? row.t + '분' : '바로';
+  const lab = cs.st === 'ok' ? '✅ 지금 가능' : cs.st === 'pt' ? `${cs.total}개 부족` : '';
+  const made = row.id && meta.discovered[row.id] ? ' <span class="muted">✔</span>' : '';
+  return `<button class="cr ${cs.st}" data-act="ctap" data-i="${i}"><span class="o">${o[0]}</span><span class="m"><b>${o[1]}</b>${made}${q ? ` = <span class="q">${q}</span>` : ''}<small>${[where, tt].filter(Boolean).join(' · ')}${row.n ? ' · ' + row.n : ''}</small></span>${lab ? `<span class="s">${lab}</span>` : ''}</button>`;
+}
+let ctTab = 'now';
+function showCraft(tab) {
+  if (!S) return;
+  ctTab = tab || ctTab || 'now';
+  let rows = CT.map((r, i) => [r, i]);
+  if (ctTab === 'now') {
+    const sc = rows.filter(([r]) => r.inp.length && !r.inp.every(([ks]) => [].concat(ks).every(k => K[k].cat === 'place' || FAC[k]))).map(([r, i]) => [r, i, ctState(r)]).filter(x => x[2].st === 'ok' || (x[2].st === 'pt' && x[2].total <= 2));
+    sc.sort((a, b) => (a[2].st === 'ok' ? 0 : a[2].total) - (b[2].st === 'ok' ? 0 : b[2].total));
+    const seen = new Set(); rows = sc.filter(([r]) => { const k = (r.id || '') + JSON.stringify(r.o); if (seen.has(k)) return false; seen.add(k); return true; }).map(([r, i]) => [r, i]);
+  } else rows = rows.filter(([r]) => r.c === ctTab);
+  const okN = CT.filter(r => ctState(r).st === 'ok').length;
+  $('#sheet').dataset.modal = '';
+  sheet(`<div class="chead"><h2>📜 조합표 <span class="muted" style="font-size:13px">전체 ${CT.length}</span></h2><button class="x" data-close aria-label="닫기">✕</button></div>
+    <div class="ctabs">${CT_CATS.map(([id, nm]) => `<button data-act="ctab" data-t="${id}" class="${ctTab === id ? 'on' : ''}">${nm}${id === 'now' ? ` ${okN}` : ''}</button>`).join('')}</div>
+    <p class="muted" style="margin:2px 0 6px">초록 = 지금 보드 카드로 가능 · 노랑 = 몇 개 부족 · <b>탭하면 필요한 카드가 보드에서 반짝여요</b></p>
+    ${rows.map(([r, i]) => ctRowHTML(r, i)).join('') || '<p>지금 바로 만들 수 있는 조합이 없어요. 장소를 살펴 재료를 모으세요. 다른 탭에서 전체 조합을 볼 수 있어요.</p>'}
+    <div class="btns"><button data-close>닫기</button></div>`);
+}
+let wantT = null;
+function flashKinds(kinds) {
+  document.querySelectorAll('.card.want').forEach(e => e.classList.remove('want'));
+  clearTimeout(wantT);
+  const ids = []; for (const st of S.stacks) { const top = st.cards[st.cards.length - 1]; for (const c of st.cards) if (kinds.includes(c.k)) { ids.push(c === top || st.cards.length === 1 ? c.id : top.id); break; } }
+  for (const id of ids) { const el = els.get(id); if (el) el.classList.add('want'); }
+  const first = ids.map(id => els.get(id)).filter(Boolean).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)[0];
+  if (first) { const b = $('#board'), r = first.getBoundingClientRect(), br = b.getBoundingClientRect(); if (r.top < br.top || r.bottom > br.bottom) b.scrollTop += r.top - br.top - 60; }
+  wantT = setTimeout(() => document.querySelectorAll('.card.want').forEach(e => e.classList.remove('want')), 3300);
+  return ids.length;
+}
+function craftTap(i) {
+  const row = CT[i]; if (!row) return;
+  const kinds = []; for (const [ks] of row.inp) kinds.push(...[].concat(ks)); if (row.on) kinds.push(row.on);
+  closeSheet();
+  const n = flashKinds(kinds), cs = ctState(row), o = Array.isArray(row.o) ? row.o : [K[row.o].e, ctName(row.o)];
+  if (cs.st === 'ok') toast(`✨ ${o[0]} ${o[1]}: 반짝이는 카드로 만들 수 있어요${row.on ? ` (${K[row.on].e} 위에 올리기)` : ''}`, 'good');
+  else if (cs.miss.length) toast(`${o[0]} ${o[1]} — 부족: ${cs.miss.map(([ks, m]) => { const k0 = [].concat(ks)[0], src = ctSrc(k0); return `${ctEm(ks)}×${m}${src ? ` (${src})` : ''}`; }).join(', ')}`);
+  else if (row.n) toast(`${o[0]} ${o[1]}: ${row.n}`);
 }
 function showLog() {
   $('#sheet').dataset.modal = '';
@@ -1406,18 +1568,20 @@ function showHelp() {
       <li>🤢 상한 음식은 탭하면 먹을지 한 번 물어봐요. 🪱 퇴비 더미(나뭇가지 2 + 잎 2)에 넣으면 24시간 뒤 🟤 퇴비 (농사용, 다음 빌드).</li>
       <li>더미는 맨 위 한 장만 집혀요. <b>×N 표시</b>를 잡고 끌면 더미 통째로.</li>
       <li><b>탭</b>: 먹기·마시기, 장소 살피기(30분). <b>🏕️ 기지 탭 = 쉬기</b>.</li>
-      <li>도구는 장소·카드 위에 올려서 써요. 🌴 정글←날 선 돌(통나무), 🌊 얕은 바다←창·낚싯대, 🥥←날 선 돌.</li>
+      <li>도구는 장소·카드 위에 올려서 써요. 🌴 정글←날 선 돌(통나무), 🌊 얕은 바다←창·낚싯대, 🥥←🪨 돌·날 선 돌. 🥢+🌾 더미→🔥 = 횃불.</li>
       <li>음식을 🔥 모닥불에 올리면 20분 뒤 익어요 (다른 행동이나 쉬기로 시간이 흘러야 함).</li>
       <li><b>시간은 행동할 때만 흘러요.</b> 생각하는 시간은 공짜.</li>
       <li>상태 4개(체력·포만감·수분·기운)는 <b>100이 가득</b>이에요. 포만감·수분은 시간이 지나면 줄고, 먹고 마시면 차요. <b>포만감·수분·기운이 0이 되면 체력이 깎여요.</b> 20 이하가 되면 막대가 빨개져요.</li>
       <li>🌡️ <b>체온</b>은 정상 36.5℃. 비(바람막이·오두막 없을 때)·밤 바깥(오두막 없을 때)·폭풍에 몸이 식고, 🔥 모닥불·🛖 오두막에서 쉬기·맑은 낮에 데워져요. 36.0 아래 오한(기운 소모 +25%), 35.0 아래 저체온(체력 −3/시간, 기운 회복 절반), 33.0 아래 심한 저체온(체력 −8/시간).</li>
       <li>🤒 <b>열</b>: 배탈, 오래 둔 부상, 목마른 채(수분 20 이하) 맑은 낮에 살피기를 하면 열이 올라요. 37.5 초과 미열(수분 더 빨리 줄어듦), 38.5 초과 고열(체력 −3/시간), 40 초과 위험(체력 −8/시간). 쉬면서 물을 마시면 내려가요.</li>
       <li>밤(18:00~06:00)에는 횃불 없이 해변·갯벌(썰물 때)만 살필 수 있어요. 밤에는 멧돼지가 올 수 있어요 (음식이 있으면 더 자주, 모닥불이 있으면 덜, 🚧 울타리·🛖 오두막이 있으면 안 와요).</li>
-      <li>날생선·고인 빗물은 배탈 위험 (탭하면 바로 먹어요). 굽거나 빗물 받이 물을 마셔요.</li>
+      <li>날생선·고인 빗물·강물은 배탈 위험 (탭하면 바로 먹어요). 🔥에 굽거나 끓이거나, 빗물 받이 물을 마셔요.</li>
       <li>🏝️ <b>갯벌</b>은 썰물(하루 2번, 2시간) 때만 열려요. 썰물 시각은 매일 1시간씩 늦어져요.</li>
       <li>⛈️ <b>7일마다 큰 폭풍</b>(12:00~다음 날 06:00), 비가 사흘 이어지면 작은 폭풍. 🛖 오두막(울타리 + 통나무 2 + 잎 3)이 없으면 체력 −8/시간(⛺ 바람막이 −3), 몸이 빠르게 식고 불이 꺼지고 시설 내구가 닳아요. 오두막 없이는 쉬어도 기운이 회복되지 않아요.</li>
       <li><b>정렬</b> 버튼: 카드를 종류별로 모아 정리.</li>
-      <li>죽으면 생존 일수·새 조합·새 장소로 <b>각인 점수</b>를 얻고, 알아낸 조합은 남아요.</li>
+      <li>📜 <b>조합표</b>(아래 버튼)에 모든 조합이 처음부터 다 보여요. 지금 만들 수 있는 건 초록, 탭하면 필요한 카드가 반짝여요.</li>
+      <li>💧 <b>물</b>: 🥥 코코넛(해변·정글, 🪨 돌로도 깸), ⛰️ 바위턱 웅덩이, 🪣 빗물 받이(잎+가지, 아침 이슬), 🏞️ 강(정글 탐사 50%)의 강물은 🔥에 끓여 마셔요.</li>
+      <li>죽으면 생존 일수·처음 만든 조합·새 장소로 <b>각인 점수</b>를 얻어요.</li>
     </ul>
     <div class="btns"><button class="pri" data-close>시작하기</button></div>`);
   meta.seenHelp = 1; saveMeta();
@@ -1463,16 +1627,16 @@ function showDeath() {
     <h3>✦ 각인 점수</h3>
     <table class="score" style="width:100%">
       <tr><td>생존 ${sc.surv}일 × 1</td><td>${sc.surv}</td></tr>
-      <tr><td>새 조합 첫 발견 ${sc.recRaw}개 (한 삶 최대 5)</td><td>${sc.rec}</td></tr>
+      <tr><td>새 조합 처음 만들기 ${sc.recRaw}개 (한 삶 최대 5)</td><td>${sc.rec}</td></tr>
       <tr><td>새 장소 첫 발견 ${life.newPlaces.length}곳 × 2</td><td>${sc.plc}</td></tr>
       <tr><td>폭풍 버티기 ${life.storms || 0}번 × 3</td><td>${sc.stm}</td></tr>
       ${life.naked ? `<tr><td>맨몸 시작 ×1.5 (내림)</td><td>×1.5</td></tr>` : ''}
       <tr><td><b>이번 삶 합계</b></td><td>+${sc.total}</td></tr>
       <tr><td>누적 각인 점수</td><td>${meta.points}</td></tr>
     </table>
-    <h3>📖 이번 삶에 새로 알아낸 조합 (${life.newRecipes.length})</h3>
+    <h3>📖 이번 삶에 처음 만들어 본 조합 (${life.newRecipes.length})</h3>
     <p>${life.newRecipes.map(id => { const b = BOOK.find(x => x[0] === id); return b[1] + ' ' + b[2]; }).join(', ') || '없음'}</p>
-    <h3>알고 있는 조합 전체 (${known.length}/${BOOK.length})</h3>
+    <h3>만들어 본 조합 전체 (${known.length}/${BOOK.length})</h3>
     <p class="muted">${known.map(b => b[1] + ' ' + b[2]).join(' · ') || '없음'}</p>
     <div class="btns"><button class="pri" data-act="restart">다시 시작</button></div>`);
 }
@@ -1499,6 +1663,9 @@ function showTraits() {
     <div class="btns"><button class="pri" data-act="go">출발 — ${SHIPS[pickShip].e} ${SHIPS[pickShip].n}${first ? '' : ' · ' + (pickNaked ? '맨몸' : pickTraits.map(id => TRAITS.find(t => t.id === id).n).join(', ') || '특성 없음')}</button></div>`);
 }
 const ACTIONS = {
+  craft() { showCraft(); },
+  ctab(b) { showCraft(b.dataset.t); },
+  ctap(b) { craftTap(+b.dataset.i); },
   snd() { SND.setOn(!SND.settings.on); syncSndBtn(); showMenu(true); },
   vol(b) { SND.setVol(b.dataset.w, +b.dataset.v); showMenu(true); setTimeout(() => SND.play(b.dataset.w === 'sfx' ? 'craft' : 'pickup'), 60); },
   restart() { pickTraits = (meta.lastTraits || []).filter(id => meta.unlocked[id]); pickNaked = false; showTraits(); },
@@ -1541,6 +1708,7 @@ const ACTIONS = {
 /* ---------- 버튼 · 기본 동작 막기 ---------- */
 $('#bSort').addEventListener('click', () => { if (S && !S.dead) { sortBoard(); toast('정렬했어요.'); } });
 $('#bBook').addEventListener('click', () => showBook());
+$('#bCraft').addEventListener('click', () => showCraft());
 $('#bLog').addEventListener('click', showLog);
 $('#bHelp').addEventListener('click', showHelp);
 $('#bMenu').addEventListener('click', () => showMenu());
@@ -1848,7 +2016,7 @@ const SHIPS = {
   fish:{n:'어선', e:'🎣', s:'낚시·생선에 강하다', d:'먹을 것에 강함 (생선 중심)', ab:['🎣 손에 밴 낚시: 창·낚싯대 성공률 +10%p', '🔺 선상 손질: 날 선 돌로도 생선 손질', '🐟 물고기 길목: 얕은 바다 물고기 최대 12→16, 하루 재생 +6→+8']},
   cargo:{n:'운반선', e:'📦', s:'시설·뗏목에 강하다', d:'기지·항해에 강함', ab:['🏗️ 짐 부리는 손: 시설 짓는 시간 −25%', '🧱 단단히 묶기: 시설 최대 내구 +25%', '⛵ 배 다루는 법 (임시): 뗏목 노끈 4→3']},
 };
-const PLACE_JOB = ['beach','sea','flat','jungle','ledge'];
+const PLACE_JOB = ['beach','sea','flat','jungle','ledge','valley'];
 // 선원 7명 (스토리 v0.2 3.3). 프로토에 없는 장소의 선원은 있는 장소로 옮김: 바늘 대나무 숲→바위턱, 달 동굴 아래쪽→얕은 바다, 할배 난파선→해변 80%, 윤 작은 무인도→바위턱 100%
 const CREW = [
   {id:'sot', n:'솥', e:'🧑‍🍳', g:'isle', role:['요리사','요리사'], pers:'걱정이 많고, 걱정만큼 밥을 많이 한다.', at:'beach', exp:30, tr:['🍲','찌그러진 냄비'],
@@ -1880,8 +2048,8 @@ const JOURNAL = [
   {id:'jn2', n:'항해일지 2장', at:'sea', exp:50, title:'일지 2 \'좌초\'', txt:'선장님이 파도에 휩쓸렸다. 대신 적는다. 배는 산호초에 걸렸고, 곰과 콩은 섬 안쪽 동굴로 갔다. 벽에 그림이 있다고 한다.'},
   {id:'jn3', n:'항해일지 3장', at:'ledge', exp:70, title:'일지 3 \'해류\'', txt:'바늘이 줄에 나무를 매달아 물길을 쟀다. 폭풍이 지난 다음 날 아침에만 바깥으로 돈다. 세 번 쟀는데, 세 번 다 같은 시각이었다. 선장님을 찾으면 그날 같이 떠난다.'},
 ];
-const COOKED = new Set(['clamc','crabc','crabkc','fishc','fishkc','eggc']);
-const WATERK = new Set(['rainw','cocoo','coco']);
+const COOKED = new Set(['clamc','crabc','crabkc','fishc','fishkc','eggc','rfishc']);
+const WATERK = new Set(['rainw','cocoo','coco','boilw','rivw']);
 const sIdx = () => S && S.ship === 'cargo' ? 1 : 0;
 const cOf = c => CREWBY[c.k.slice(3)];
 const isMate = c => c && c.k.startsWith('cw_');
@@ -2006,7 +2174,7 @@ function jobOf(root) {
   if (root.k === 'base' || FAC[root.k] || ['compost','raft','bigraft'].includes(root.k)) return 'base';
   return null;
 }
-const JOBNM = {beach:'🏖️ 해변', sea:'🌊 얕은 바다', flat:'🏝️ 갯벌', jungle:'🌴 정글', ledge:'⛰️ 바위턱', fire:'🔥 모닥불', base:'🏕️ 기지', signal:'🗼 신호대'};
+const JOBNM = {valley:'🏞️ 강', beach:'🏖️ 해변', sea:'🌊 얕은 바다', flat:'🏝️ 갯벌', jungle:'🌴 정글', ledge:'⛰️ 바위턱', fire:'🔥 모닥불', base:'🏕️ 기지', signal:'🗼 신호대'};
 function assignJob(m, root) {
   const j = jobOf(root), c = cOf(m);
   if (!j) { toast(`${c.n}: 장소·🔥 모닥불·🏕️ 기지·🗼 신호대에 올리면 일을 맡아요.`); SND.play('reject'); return render(); }
@@ -2052,7 +2220,7 @@ function crewRoll(k, m) {
   }
   return null;
 }
-const ACTS = {beach:'살피는 중', sea:'살피는 중', flat:'살피는 중', jungle:'살피는 중', ledge:'살피는 중', base:'기지 대기', fire:'불 지킴', signal:'배 지켜봄'};
+const ACTS = {valley:'살피는 중', beach:'살피는 중', sea:'살피는 중', flat:'살피는 중', jungle:'살피는 중', ledge:'살피는 중', base:'기지 대기', fire:'불 지킴', signal:'배 지켜봄'};
 function crewWork(m) {
   const c = cOf(m), j = m.job;
   if (PLACE_JOB.includes(j)) {
@@ -2114,7 +2282,7 @@ function crewEat(m) {
     if (f) { removeCards([f]); m.h = clamp(m.h + (K[f.k].eat.h || 0) + 10); m.w = clamp(m.w + (K[f.k].eat.t || 0)); ate = true; }
   }
   if (m.w < 50) {
-    const w = allCards().find(x => x.k === 'rainw' || x.k === 'cocoo');
+    const w = allCards().find(x => x.k === 'boilw') || allCards().find(x => x.k === 'rainw' || x.k === 'cocoo');
     if (w) { removeCards([w]); m.w = clamp(m.w + K[w.k].eat.t + 10); m.h = clamp(m.h + (K[w.k].eat.h || 0)); ate = true; }
   }
   if (ate) S.crewGain['🍽️식사'] = (S.crewGain['🍽️식사'] || 0) + 1;
@@ -2124,7 +2292,7 @@ function crewFeedAll() {
   let fed = 0;
   for (const m of mates()) {
     if (m.h < 60) { const f = allCards().find(x => COOKED.has(x.k)) || allCards().find(x => canFeed(x) && K[x.k].cat === 'food' && !K[x.k].raw); if (f) { removeCards([f]); m.h = clamp(m.h + (K[f.k].eat.h || 0)); m.w = clamp(m.w + (K[f.k].eat.t || 0)); fed++; } }
-    if (m.w < 60) { const w = allCards().find(x => x.k === 'rainw' || x.k === 'cocoo'); if (w) { removeCards([w]); m.w = clamp(m.w + K[w.k].eat.t); m.h = clamp(m.h + (K[w.k].eat.h || 0)); fed++; } }
+    if (m.w < 60) { const w = allCards().find(x => x.k === 'boilw') || allCards().find(x => x.k === 'rainw' || x.k === 'cocoo'); if (w) { removeCards([w]); m.w = clamp(m.w + K[w.k].eat.t); m.h = clamp(m.h + (K[w.k].eat.h || 0)); fed++; } }
   }
   if (fed) say(`🍲 솥이 배식했다 (${fed}번). 보드의 음식·물을 썼다.`);
 }
@@ -2335,7 +2503,7 @@ const tHas = k => tN(k) > 0;
 const tTops = (pred, max = 9) => S.stacks.filter(st => pred(st.cards[st.cards.length - 1])).slice(0, max).map(st => st.cards[st.cards.length - 1].id);
 const tKind = (k, max) => tTops(c => c.k === k, max);
 const tPlace = k => { const st = placeSt(k); return st ? [st.cards[0].id] : []; };
-const tRaw = c => K[c.k].cook && !isMate(c) && !isTired(c);
+const tRaw = c => K[c.k].cook && K[c.k].cat === 'food' && !isMate(c) && !isTired(c);
 const tFeed = c => canFeed(c) && !isMate(c) && !isTired(c);
 const tMates = () => S.crew ? mates() : [];
 function tutCrew() {
@@ -2350,6 +2518,8 @@ const tCooking = () => allCards().some(c => c.k === 'fire' && c.cook);
 const tCooked = () => allCards().some(c => COOKED.has(c.k));
 const TUT = [
   {id:'sharp', g:'배도, 선원도 없다.', t:'돌을 쳐서 날을 세운다.', h:'🪨 끌어 🪨 위에', need:[['stone', 2, 'beach', 'stone', '🪨']], hl:() => tKind('stone', 2), done:() => tHas('sharp') || tHas('knife')},
+  {id:'drink', g:'목이 탄다.', t:() => tHas('cocoo') ? '목을 축인다. 코코넛은 돌로도 깬다.' : '코코넛을 깨서 마신다.', h:() => tHas('cocoo') ? '🥛 탭' : '🔺→🥥', need:[[c => c.k === 'coco' || c.k === 'cocoo', 1, 'jungle', 'coco', '🥥']],
+   hl:() => tHas('cocoo') ? tKind('cocoo', 1) : tKind('sharp', 1).concat(tKind('coco', 1)), done:() => S.tut.ev.drink},
   {id:'rope', g:'바다제비호는 어디 있나.', t:'섬유를 꼬아 줄을 만든다.', h:'🌾→🌾', need:[['fiber', 2, 'jungle', 'fiber', '🌾']], hl:() => tKind('fiber', 2), done:() => tHas('rope')},
   {id:'drill', g:'일곱 명이 타고 있었다.', t:'가지 둘로 손드릴을.', h:'🥢→🥢', need:[['stick', 2, 'jungle', 'stick', '🥢']], hl:() => tKind('stick', 2), done:() => tHas('drill')},
   {id:'ember', g:'해 지기 전에 불을.', t:'비비고, 또 비빈다.', h:'🌀→🌾', need:[['fiber', 1, 'jungle', 'fiber', '🌾'], ['stick', 1, 'jungle', 'stick', '🥢']], hl:() => tKind('drill', 1).concat(tKind('fiber', 1)), done:() => tHas('ember') || tHas('fire') || tHas('firex')},
@@ -2401,7 +2571,7 @@ function tutCheck(quiet) {
 }
 function tutEnd(skip) {
   S.tut = null; meta.tutDone = 1; saveMeta(); saveRun(); tutPaint(); render();
-  toast(skip ? '안내는 ⋯ 메뉴에서 다시 볼 수 있어요.' : '🎓 조합은 📖 도감에 있어요.', skip ? '' : 'good');
+  toast(skip ? '안내는 ⋯ 메뉴에서 다시 볼 수 있어요.' : '🎓 모든 조합은 📜 조합표에 있어요.', skip ? '' : 'good');
 }
 function tutPaint() {
   const el = $('#tut'), c = tutCur();
@@ -2428,6 +2598,7 @@ function boot() {
     S = run;
     applyShipRecipes();
     if (S.crew && !S.crewGain) S.crewGain = {};
+    { const P0 = initPools(); for (const k in P0) { if (!S.places[k]) S.places[k] = P0[k]; else for (const pk in P0[k].pools) if (!S.places[k].pools[pk]) S.places[k].pools[pk] = P0[k].pools[pk]; } } // 〔물 완화·강〕 예전 저장에 새 자원 풀 추가
     if (!S.st100) { S.hunger = 100 - S.hunger; S.thirst = 100 - S.thirst; S.st100 = 1; saveRun(); } // 〔v0.5〕 상태 100 기준으로 옮기기
     if (typeof S.temp !== 'number' || S.temp > 45) { S.temp = 36.5; saveRun(); }
     for (const c of allCards()) if (FAC[c.k] && c.fd === undefined) c.fd = FAC[c.k].max; // 〔v0.5 확정: 시설 내구도·보수〕 예전 시설은 내구 가득 // 〔v0.5 확정: 체온〕 예전 저장은 36.5℃로 시작
@@ -2440,7 +2611,7 @@ function boot() {
   if (!meta.seenHelp) showHelp();
 }
 function sortBoardIfOff() { if (S.stacks.some(st => st.x + D.cw > D.W + 2)) sortBoard(true); }
-window.__game = {R:RATE, FUEL, easy, tut:{TUT, tutCur, tutSteps, tutStart, tutEnd}, story:{CREW, mates, mateOf, crewHour, learn, endingFlow, finishEnding, DBG, showIntro, closeIntro, homeN, homeAll, pickCrew, SHIPS, END}, fi:(a, b) => fixedInteraction(a, b, stackOf(b)), snd:SND, tide:{open:() => flatOpen(), windows:tideWindows}, get S() { return S; }, get meta() { return meta; }, sortBoard, render, D, K, advance:(m) => { advance(m); after(); }};
+window.__game = {R:RATE, FUEL, easy, easyW, CT, ctState, showCraft, BOOK, tut:{TUT, tutCur, tutSteps, tutStart, tutEnd}, story:{CREW, mates, mateOf, crewHour, learn, endingFlow, finishEnding, DBG, showIntro, closeIntro, homeN, homeAll, pickCrew, SHIPS, END}, fi:(a, b) => fixedInteraction(a, b, stackOf(b)), snd:SND, tide:{open:() => flatOpen(), windows:tideWindows}, get S() { return S; }, get meta() { return meta; }, sortBoard, render, D, K, advance:(m) => { advance(m); after(); }};
 boot();
 </script>
 </body>
