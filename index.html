@@ -126,6 +126,8 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
 #sheet button.cr.ok{background:#e2f6d8;outline:2px solid #6cc35a}
 #sheet button.cr.ok .s{background:#6cc35a;color:#fff}
 #sheet button.cr.pt .s{background:#ffe08a;color:#5a4300}
+#sheet button.cr .s small{display:block;font-size:10px;font-weight:700;color:#eaffe0}
+#sheet button.cr.blk .s{background:#e8dcc0;color:#7a5b2a}
 .card.want .ci{animation:want .45s ease-in-out 7 alternate;outline:4px solid #4fd1ff;outline-offset:1px}
 @keyframes want{from{transform:none;box-shadow:0 0 0 0 rgba(79,209,255,.0)}to{transform:scale(1.08);box-shadow:0 0 0 8px rgba(79,209,255,.55)}}
 #sheet .rcp{display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid #eadfc4;font-size:14px}
@@ -983,8 +985,7 @@ function handleDrop(drag, target, pos) {
   if (tRoot.k === 'fire' && T.cards.length === 1 && moving.length === 2 && eqCounts(counts(moving), {stick:1, fiber:1})) {
     if (!canAct(1)) return render();
     takeOut(src, drag.idx);
-    act(10, 1, () => { spawnNear(mk('torch'), T); discover('torchfire'); SND.q('ignite'); say('🕯️ 모닥불에 붙여 횃불을 만들었다 (10분, 불씨 없이).', 'good'); });
-    return;
+    return torchFromFire(T);
   }
   // 1) 고정 카드 위
   if (FIXED.has(tRoot.k) && T.cards.length === 1) {
@@ -1025,6 +1026,7 @@ function handleDrop(drag, target, pos) {
   toast('함께 쌓을 수 없는 카드예요.'); SND.play('reject');
   render();
 }
+function torchFromFire(T) { act(10, 1, () => { spawnNear(mk('torch'), T); discover('torchfire'); SND.q('ignite'); say('🕯️ 모닥불에 붙여 횃불을 만들었다 (10분, 불씨 없이).', 'good'); }); }
 function merge(T, src, idx) {
   const moving = src.cards.splice(idx);
   if (!src.cards.length) S.stacks.splice(S.stacks.indexOf(src), 1);
@@ -1282,7 +1284,7 @@ function thermoHTML() { // 〔v0.5 확정: 체온〕 온도계 칩 (추우면 �
 
 /* ---------- 포인터 (드래그 / 탭) ---------- */
 let drag = null;
-const DRAG_PX = 10, DRAG_PX_LIFT = 4, LIFT_MS = 260;
+const DRAG_PX = 10, DRAG_PX_LIFT = 4, LIFT_MS = 220;
 function fieldPt(e) { const r = $('#field').getBoundingClientRect(); return {x:e.clientX - r.left, y:e.clientY - r.top}; }
 function cardFromEl(el) {
   const id = +el.dataset.id;
@@ -1330,7 +1332,7 @@ function moveDrag(e) {
   drag.x = p.x - drag.ox; drag.y = p.y - drag.oy;
   drag.els.forEach((el, j) => { if (el) el.style.transform = `translate3d(${drag.x}px,${drag.y + (drag.pile ? Math.min(j, 4) * D.po : j * D.mo)}px,0)`; });
   const t = findTarget(e);
-  const hlEl = t ? els.get(t.cards[t.cards.length - 1].id) : null;
+  const hlEl = t ? els.get((t === drag.stack ? t.cards[drag.idx - 1] : t.cards[t.cards.length - 1]).id) : null;
   if (drag.hl !== hlEl) { if (drag.hl) drag.hl.classList.remove('hl'); if (hlEl) hlEl.classList.add('hl'); drag.hl = hlEl; }
   if (!drag.far && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 40) drag.far = true;
   // 가장자리 자동 스크롤: 가장자리 밖에서 들어왔을 때만, 천천히 (아래쪽 카드를 집자마자 화면이 밀리던 문제)
@@ -1338,18 +1340,21 @@ function moveDrag(e) {
   if (!inEdge) drag.edgeOk = true;
   if (drag.edgeOk && drag.far && inEdge) b.scrollTop += e.clientY > br.bottom - 30 ? 6 : -6;
 }
+// 드롭 판정 (손가락 기준 넉넉하게): 손가락이 대상(여유 14px 포함) 위에 있거나, 끌던 카드가 대상과 22% 이상 겹치면 붙음. 여러 개면 가장 많이 겹친 대상
+const DROP_PAD = 14, DROP_AREA = .22;
 function findTarget(e) {
-  const el = document.elementFromPoint(e.clientX, e.clientY);
-  const ce = el && el.closest && el.closest('.card');
-  if (ce && !ce.classList.contains('dragging')) { const h = cardFromEl(ce); if (h && h.st !== drag.stack) return h.st; if (h && h.st === drag.stack && h.i < drag.idx) return h.st; }
-  // 겹친 넓이로 보조 판정
-  let best = null, ba = D.cw * D.ch * .35;
+  const p = fieldPt(e), area = D.cw * D.ch;
+  let best = null, bs = -1;
   for (const st of S.stacks) {
-    if (st === drag.stack) continue;
-    const ty = st.y + stackH(st) - D.ch;
-    const ox = Math.min(drag.x + D.cw, st.x + D.cw) - Math.max(drag.x, st.x);
-    const oy = Math.min(drag.y + D.ch, ty + D.ch) - Math.max(drag.y, ty);
-    if (ox > 0 && oy > 0 && ox * oy > ba) { ba = ox * oy; best = st; }
+    let h;
+    if (st === drag.stack) { if (drag.idx === 0) continue; h = D.ch + (isPile(st) ? Math.min(drag.idx - 1, 4) * D.po : (drag.idx - 1) * D.mo); }
+    else h = stackH(st);
+    const ox = Math.min(drag.x + D.cw, st.x + D.cw) - Math.max(drag.x, st.x), oy = Math.min(drag.y + D.ch, st.y + h) - Math.max(drag.y, st.y);
+    const ov = ox > 0 && oy > 0 ? ox * oy : 0;
+    const inside = p.x >= st.x - DROP_PAD && p.x <= st.x + D.cw + DROP_PAD && p.y >= st.y - DROP_PAD && p.y <= st.y + h + DROP_PAD;
+    if (!inside && ov < area * DROP_AREA) continue;
+    const sc = ov + (inside ? area * .08 : 0);
+    if (sc > bs) { bs = sc; best = st; }
   }
   return best;
 }
@@ -1439,6 +1444,8 @@ const CT = [
   {c:'tool', id:'torch', o:'torch', inp:[['stick',1],['fiber',1],['ember',1]], t:20, n:'밤 살피기 · 동굴 · 신호 연기'},
   {c:'tool', id:'torchfire', o:'torch', inp:[['stick',1],['fiber',1]], on:'fire', t:10, n:'🥢+🌾를 한 더미로 쌓아 🔥 위에 · 불씨 필요 없음'},
   {c:'tool', id:'relight', o:'torch', inp:[['torchx',1]], on:'fire', t:5, n:'꺼진 횃불 다시 붙이기 (내구 4)'},
+  {c:'fire', id:'torchfire', o:'torch', inp:[['stick',1],['fiber',1]], on:'fire', t:10, n:'🥢+🌾 한 더미 → 🔥 위 · 불씨 필요 없음'},
+  {c:'fire', id:'relight', o:'torch', inp:[['torchx',1]], on:'fire', t:5, n:'꺼진 횃불 → 🔥 위 (내구 4)'},
   {c:'fire', id:'ember', o:'ember', inp:[['drill',1,'tool'],['fiber',1]], t:20, n:'성공 70% (비 40%) · 30분 안에 써야 함'},
   {c:'fire', id:'campfire', o:'fire', inp:[['ember',1],['stick',1]], t:10, n:'연료 8시간'},
   {c:'fire', id:'fuel', o:['🔥','모닥불 연료'], inp:[[['stick','plank','log'],1]], on:'fire', t:0, n:'🥢·🟫 +4시간, 🪵 +12시간 (최대 24시간)'},
@@ -1487,13 +1494,90 @@ const CT = [
 ];
 const ctName = k => K[k].sn || K[k].n;
 function ctHave(ks) { const a = [].concat(ks); return allCards().filter(c => a.includes(c.k) && !(K[c.k].dur && c.dur <= 0)).length; }
+/* 원탭 제작: 보드에서 쓸 수 있는 카드(같은 종류 더미·낱장, 시설·장소·진행 중인 섞인 더미 제외)를 골라 기존 조합 함수 그대로 실행 */
+const CTQ = {sharp:{t:'rcp'}, rope:{t:'rcp'}, reedrope:{t:'rcp'}, drill:{t:'rcp'}, knife:{t:'rcp'}, spear:{t:'rcp'}, rod:{t:'rcp'}, torch:{t:'rcp'}, campfire:{t:'rcp'},
+  torchfire:{t:'torchfire'}, relight:{t:'fix', a:['torchx','torch'], on:'fire'}, ember:{t:'tool', tool:['drill'], item:'fiber'},
+  fuel:{t:'fix', a:['stick','plank','log'], on:'fire'}, relightfire:{t:'fix', a:['ember'], on:'firex'},
+  cleanfish:{t:'tool', tool:['knife','sharp'], item:'fish'}, cleancrab:{t:'tool', tool:['knife'], item:'crab'}, opencoco:{t:'tool', tool:['sharp','knife','stone'], item:'coco'},
+  cook_boilw:{t:'fix', a:['rivw','rainw'], on:'fire'},
+  bed:{t:'fac'}, catcher:{t:'fac'}, windbreak:{t:'fac'}, fence:{t:'fac'}, hut:{t:'fac'}, compost:{t:'fac'}, signal:{t:'fac'}, raft:{t:'fac'}, bigraft:{t:'fac'},
+  chop:{t:'fix', a:['knife','sharp'], on:'jungle'}, fish_spear:{t:'fix', a:['spear'], on:'sea'}, fish_rod:{t:'fix', a:['rod'], on:'sea'},
+  smoke:{t:'fix', a:['torch','ember'], on:'signal'}, depart:{t:'fix', a:['bigraft','raft'], on:'sea'}};
+for (const row of CT) {
+  if (row.id && CTQ[row.id]) row.q = CTQ[row.id];
+  else if (row.id && row.id.startsWith('cook_')) row.q = {t:'fix', a:[].concat(row.inp[0][0]), on:'fire'};
+  else if (!row.id && Array.isArray(row.o) && row.o[0] === '🔨') row.q = {t:'fix', a:[].concat(row.inp[0][0]), on:row.on};
+  else if (!row.id && Array.isArray(row.o) && row.o[0] === '🪣') row.q = {t:'tapc'};
+}
+function freeCards(k) {
+  const out = [];
+  for (const st of S.stacks) { if (FIXED.has(st.cards[0].k) || !allSame(st.cards) || st.cards[0].k !== k) continue; for (const c of st.cards) if (!(K[c.k].dur && c.dur <= 0)) out.push(c); }
+  return out.sort((a, b) => (b.dur || 0) - (a.dur || 0) || (a.sp || 1e12) - (b.sp || 1e12));
+}
+function ctPick(alts, n, used) { const out = []; for (const k of [].concat(alts)) for (const c of freeCards(k)) { if (out.length >= n) break; if (!used.has(c)) out.push(c); } if (out.length < n) return null; out.forEach(c => used.add(c)); return out; }
+const fixedSt = k => S.stacks.find(st => st.cards.length === 1 && st.cards[0].k === k);
+const noEnergy = e => e > 0 && S.energy <= 0;
+function shortWhy(m) {
+  for (const [w, sh] of [['굽는 중', '굽는 중'], ['폭풍', '⛈️ 폭풍 중'], ['튼튼', '튼튼함'], ['맑은 낮', '맑은 낮에만'], ['해류', '출항 때 아님'], ['이미 연기', '연기 올림'], ['오늘은 이미', '내일 다시'], ['타고 있', '이미 타는 중']]) if (m.includes(w)) return sh;
+  return '지금 불가';
+}
+function ctPlan(row) {
+  const q = row.q; if (!q || !S || S.dead || S.pre) return null;
+  const used = new Set(), busy = {r:'재료가 다른 더미에 섞여 있어요 (섞인 더미는 건드리지 않음)', s:'다른 더미에'};
+  if (q.t === 'rcp' || q.t === 'fac') {
+    const r = RECIPES.find(x => x.id === row.id); if (!r) return null;
+    let fst = null; const mats = [];
+    for (const [k, n] of Object.entries(r.inp)) {
+      if (r.up && k === r.up) { fst = fixedSt(k); if (!fst) return {ok:false}; continue; }
+      const got = ctPick(k === 'rope' ? ['rope', 'vine'] : [k], n, used); if (!got) return {ok:false, ...busy}; mats.push(...got);
+    }
+    const ings = mats.concat(fst ? fst.cards : []);
+    if (r.unique && r.unique.some(u => existsOutside(u, ings))) return {ok:false, r:`${K[r.out].e} ${K[r.out].n}은(는) 이미 있어요.`, s:'이미 있음'};
+    if (noEnergy(r.e)) return {ok:false, r:'기운이 없어요. 🏕️ 기지에서 쉬세요.', s:'기운 없음'};
+    if (q.t === 'fac') { const base = fixedSt('base'); if (!base && !fst) return {ok:false}; return {ok:true, run:() => fst ? craft(r, fst, mats) : craft(r, {x:base.x, y:base.y + D.cellH, cards:[]}, mats)}; }
+    const c0 = mats[0], st0 = stackOf(c0);
+    return {ok:true, run:() => craft(r, {x:st0.x, y:st0.y, cards:[c0], pileSrc:st0.cards.length > 1 ? st0 : null}, mats.slice(1))};
+  }
+  if (q.t === 'torchfire') {
+    const f = fixedSt('fire'); if (!f) return {ok:false};
+    const a = ctPick(['stick'], 1, used), b = ctPick(['fiber'], 1, used); if (!a || !b) return {ok:false, ...busy};
+    if (noEnergy(1)) return {ok:false, r:'기운이 없어요.', s:'기운 없음'};
+    return {ok:true, run:() => { removeCards([a[0], b[0]]); torchFromFire(f); }};
+  }
+  if (q.t === 'tapc') { const c = allCards().find(x => x.k === 'catcher'); if (!c) return {ok:false}; if (!c.water) return {ok:false, r:'🪣 비어 있어요 (비 1시간마다·아침 이슬로 참)', s:'비어 있음'}; return {ok:true, run:() => drinkCatcher(c)}; }
+  let first = null;
+  if (q.t === 'tool') {
+    const items = freeCards(q.item); if (!items.length) return {ok:false, ...(allCards().some(c => c.k === q.item) ? busy : {})};
+    for (const tk of q.tool) for (const tl of freeCards(tk)) {
+      const x = toolPair(tl, items[0], stackOf(items[0]));
+      if (x) { if (noEnergy(x.e || 0)) return {ok:false, r:'기운이 없어요.', s:'기운 없음'}; return {ok:true, run:x.run}; }
+    }
+    return {ok:false, ...(q.tool.some(k => allCards().some(c => c.k === k)) ? busy : {})};
+  }
+  if (q.t === 'fix') {
+    const T = fixedSt(q.on); if (!T) return {ok:false};
+    for (const k of q.a) for (const a of freeCards(k).slice(0, 4)) {
+      const x = fixedInteraction(a, T.cards[0], T);
+      if (x && x.run) { if (noEnergy(x.e || 0)) return {ok:false, r:'기운이 없어요.', s:'기운 없음'}; return {ok:true, run:x.run}; }
+      if (x && x.msg && !first) first = x.msg;
+    }
+    if (first) return {ok:false, r:first, s:shortWhy(first)};
+    if (q.a.some(k => freeCards(k).length)) return {ok:false, r:'지금은 할 수 없어요', s:'지금 불가'};
+    return {ok:false, ...(q.a.some(k => allCards().some(c => c.k === k)) ? busy : {})};
+  }
+  return null;
+}
 function ctState(row) {
   if (!row.inp.length && !row.on) return {st:'na', miss:[]};
   const miss = []; let any = false;
   for (const [ks, n] of row.inp) { const h = ctHave(ks); if (h > 0) any = true; if (h < n) miss.push([ks, n - h]); }
   if (row.on && !ctHave(row.on)) miss.push([row.on, 1]);
   const total = miss.reduce((a, m) => a + m[1], 0);
-  return {st: !miss.length ? 'ok' : any ? 'pt' : 'no', miss, total};
+  if (!row.q) return {st: !miss.length ? 'have' : any ? 'pt' : 'no', miss, total};
+  const p = ctPlan(row);
+  if (p && p.ok) return {st:'ok', miss:[], total:0, plan:p};
+  if (!miss.length) return {st:'blk', miss, total, why:p && p.r || '지금은 할 수 없어요', short:p && p.s || '지금 불가'};
+  return {st: any ? 'pt' : 'no', miss, total};
 }
 function ctSrc(k) { // 어디서 나오는지
   const at = []; for (const p of ['beach','sea','flat','jungle','ledge','valley']) if (dropTable(p).some(d => d[0] === k)) at.push(K[p].e);
@@ -1505,7 +1589,7 @@ function ctRowHTML(row, i) {
   const q = row.inp.map(([ks, n, tl]) => `${ctEm(ks)}${n > 1 ? '×' + n : ''}${tl ? '<sup>도구</sup>' : ''}`).join(' + ');
   const where = row.on ? `→ ${K[row.on].e}${ctName(row.on)} 위` : (row.inp.length > 1 ? '카드끼리 겹치기' : '');
   const tt = row.t >= 60 ? (row.t % 60 ? (row.t / 60).toFixed(1) : row.t / 60) + '시간' : row.t ? row.t + '분' : '바로';
-  const lab = cs.st === 'ok' ? '✅ 지금 가능' : cs.st === 'pt' ? `${cs.total}개 부족` : '';
+  const lab = cs.st === 'ok' ? '✅ 지금 가능<small>탭하면 만듦</small>' : cs.st === 'pt' ? `${cs.total}개 부족` : cs.st === 'blk' ? cs.short : '';
   const made = row.id && meta.discovered[row.id] ? ' <span class="muted">✔</span>' : '';
   return `<button class="cr ${cs.st}" data-act="ctap" data-i="${i}"><span class="o">${o[0]}</span><span class="m"><b>${o[1]}</b>${made}${q ? ` = <span class="q">${q}</span>` : ''}<small>${[where, tt].filter(Boolean).join(' · ')}${row.n ? ' · ' + row.n : ''}</small></span>${lab ? `<span class="s">${lab}</span>` : ''}</button>`;
 }
@@ -1523,7 +1607,7 @@ function showCraft(tab) {
   $('#sheet').dataset.modal = '';
   sheet(`<div class="chead"><h2>📜 조합표 <span class="muted" style="font-size:13px">전체 ${CT.length}</span></h2><button class="x" data-close aria-label="닫기">✕</button></div>
     <div class="ctabs">${CT_CATS.map(([id, nm]) => `<button data-act="ctab" data-t="${id}" class="${ctTab === id ? 'on' : ''}">${nm}${id === 'now' ? ` ${okN}` : ''}</button>`).join('')}</div>
-    <p class="muted" style="margin:2px 0 6px">초록 = 지금 보드 카드로 가능 · 노랑 = 몇 개 부족 · <b>탭하면 필요한 카드가 보드에서 반짝여요</b></p>
+    <p class="muted" style="margin:2px 0 6px"><b>초록 줄을 탭하면 바로 만들어요</b> · 노랑 = 몇 개 부족 · 그 밖의 줄을 탭하면 필요한 카드가 보드에서 반짝여요</p>
     ${rows.map(([r, i]) => ctRowHTML(r, i)).join('') || '<p>지금 바로 만들 수 있는 조합이 없어요. 장소를 살펴 재료를 모으세요. 다른 탭에서 전체 조합을 볼 수 있어요.</p>'}
     <div class="btns"><button data-close>닫기</button></div>`);
 }
@@ -1541,9 +1625,15 @@ function flashKinds(kinds) {
 function craftTap(i) {
   const row = CT[i]; if (!row) return;
   const kinds = []; for (const [ks] of row.inp) kinds.push(...[].concat(ks)); if (row.on) kinds.push(row.on);
+  const cs0 = ctState(row), o = Array.isArray(row.o) ? row.o : [K[row.o].e, ctName(row.o)];
   closeSheet();
-  const n = flashKinds(kinds), cs = ctState(row), o = Array.isArray(row.o) ? row.o : [K[row.o].e, ctName(row.o)];
-  if (cs.st === 'ok') toast(`✨ ${o[0]} ${o[1]}: 반짝이는 카드로 만들 수 있어요${row.on ? ` (${K[row.on].e} 위에 올리기)` : ''}`, 'good');
+  if (cs0.st === 'ok') { // 원탭 제작
+    SND.play('stack');
+    try { cs0.plan.run(); } catch (err) { console.warn(err); render(); }
+    return;
+  }
+  const n = flashKinds(kinds), cs = cs0;
+  if (cs.st === 'blk') toast(`${o[0]} ${o[1]}: ${cs.why}`, 'bad');
   else if (cs.miss.length) toast(`${o[0]} ${o[1]} — 부족: ${cs.miss.map(([ks, m]) => { const k0 = [].concat(ks)[0], src = ctSrc(k0); return `${ctEm(ks)}×${m}${src ? ` (${src})` : ''}`; }).join(', ')}`);
   else if (row.n) toast(`${o[0]} ${o[1]}: ${row.n}`);
 }
@@ -2611,7 +2701,7 @@ function boot() {
   if (!meta.seenHelp) showHelp();
 }
 function sortBoardIfOff() { if (S.stacks.some(st => st.x + D.cw > D.W + 2)) sortBoard(true); }
-window.__game = {R:RATE, FUEL, easy, easyW, CT, ctState, showCraft, BOOK, tut:{TUT, tutCur, tutSteps, tutStart, tutEnd}, story:{CREW, mates, mateOf, crewHour, learn, endingFlow, finishEnding, DBG, showIntro, closeIntro, homeN, homeAll, pickCrew, SHIPS, END}, fi:(a, b) => fixedInteraction(a, b, stackOf(b)), snd:SND, tide:{open:() => flatOpen(), windows:tideWindows}, get S() { return S; }, get meta() { return meta; }, sortBoard, render, D, K, advance:(m) => { advance(m); after(); }};
+window.__game = {ctPlan, DROP_PAD, R:RATE, FUEL, easy, easyW, CT, ctState, showCraft, BOOK, tut:{TUT, tutCur, tutSteps, tutStart, tutEnd}, story:{CREW, mates, mateOf, crewHour, learn, endingFlow, finishEnding, DBG, showIntro, closeIntro, homeN, homeAll, pickCrew, SHIPS, END}, fi:(a, b) => fixedInteraction(a, b, stackOf(b)), snd:SND, tide:{open:() => flatOpen(), windows:tideWindows}, get S() { return S; }, get meta() { return meta; }, sortBoard, render, D, K, advance:(m) => { advance(m); after(); }};
 boot();
 </script>
 </body>
