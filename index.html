@@ -57,6 +57,7 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
 .card.dragging .ci{box-shadow:0 16px 28px rgba(0,0,0,.45);transform:translateY(-10px) scale(1.16) rotate(-2deg);transition:transform .08s}
 .card.lift .ci{transform:scale(1.07);box-shadow:0 8px 16px rgba(0,0,0,.35)}
 .card.hl .ci{outline:4px solid #ffe24a;outline-offset:1px;box-shadow:0 0 0 7px rgba(255,226,74,.45),0 2px 4px rgba(0,0,0,.25);transform:scale(1.05)}
+.card .pinb{position:absolute;left:-6px;top:-8px;font-size:17px;line-height:1;z-index:6;pointer-events:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,.45))}
 .card.newc .ci{animation:newc .6s ease-out}
 @keyframes newc{0%{transform:scale(1.15);box-shadow:0 0 0 5px #8fe388}100%{transform:none}}
 .ci .jb{position:absolute;top:1px;left:2px;font-size:calc(var(--cw)*.2);line-height:1}
@@ -1084,7 +1085,7 @@ function compostAdd(moving, src, idx, heap) {
 }
 function craft(r, T, moving) {
   if (!canAct(r.e)) return render();
-  const pos = {x:T.x, y:T.y};
+  const pos = {x:T.x, y:T.y}, keepPin = !T.pileSrc && (T.cards || []).some(c => c.pin);
   removeCards(T.cards.concat(moving));
   if (T.pileSrc && S.stacks.includes(T.pileSrc)) { const p = findFree(T.x, T.y + D.cellH); pos.x = p.x; pos.y = p.y; }
   const rt = recipeTime(r);
@@ -1092,7 +1093,7 @@ function craft(r, T, moving) {
     const c = mk(r.out);
     if (L_('nul') && S.ship === 'fish' && (r.out === 'spear' || r.out === 'rod')) { c.dur += 4; c.mx = c.dur; }
     if (['rope','spear','rod'].includes(r.id)) learn('nul');
-    if (!pileFor(c) && !overlapsAny({x:pos.x, y:pos.y, w:D.cw, h:D.ch})) addStack([c], pos.x, pos.y); else spawnNear(c, {x:pos.x, y:pos.y, cards:[]});
+    if (!pileFor(c) && !overlapsAny({x:pos.x, y:pos.y, w:D.cw, h:D.ch})) { addStack([c], pos.x, pos.y); if (keepPin) c.pin = 1; } else spawnNear(c, {x:pos.x, y:pos.y, cards:[]});
     discover(r.id);
     SND.q(r.out === 'fire' || r.out === 'torch' ? 'ignite' : 'craft');
     say(`${K[r.out].e} ${K[r.out].n} 완성 (${rt}분)`);
@@ -1130,12 +1131,17 @@ function spawnNear(card, st) {
   addStack([card], p.x, p.y);
 }
 function fieldH() { let m = 0; for (const st of S.stacks) m = Math.max(m, st.y + stackH(st)); return m + D.gap; }
+// 📌 고정 카드: 더미의 맨 아래 카드(st.cards[0])에 pin. 정렬해도 자리 그대로, 다른 카드는 그 자리를 피해서 놓임
+const isPinned = st => !!(st && st.cards[0] && st.cards[0].pin);
 function sortBoard(silent) {
   const places = [], fixed = [], mixed = [], byKind = {};
+  const pinned = S.stacks.filter(isPinned), pinPile = {};
+  for (const st of pinned) { st.x = Math.max(0, Math.min(st.x, D.W - D.cw)); st.y = Math.max(0, st.y); const k = st.cards[0].k; if (allSame(st.cards) && !FIXED.has(k) && !pinPile[k]) pinPile[k] = st; }
   for (const st of S.stacks) {
+    if (isPinned(st)) continue;
     const k0 = st.cards[0].k;
     if (st.cards.length === 1 && FIXED.has(k0)) (PLACE_SORT.includes(k0) ? places : fixed).push(st);
-    else if (allSame(st.cards) && !FIXED.has(k0)) (byKind[k0] = byKind[k0] || []).push(...st.cards);
+    else if (allSame(st.cards) && !FIXED.has(k0)) { if (pinPile[k0]) pinPile[k0].cards.push(...st.cards); else (byKind[k0] = byKind[k0] || []).push(...st.cards); }
     else mixed.push(st);
   }
   places.sort((a, b) => PLACE_SORT.indexOf(a.cards[0].k) - PLACE_SORT.indexOf(b.cards[0].k));
@@ -1145,22 +1151,36 @@ function sortBoard(silent) {
     const cs = byKind[k].sort((x, y) => (y.dur || 0) - (x.dur || 0) || (y.sp || 1e9) - (x.sp || 1e9));
     return {id:'s' + (S.nid++), x:0, y:0, cards:cs};
   });
-  const out = [];
-  let y = D.gap;
-  const row = (items) => {
-    let h = 0;
-    items.forEach((st, i) => { st.x = D.gap + i * (D.cw + D.gap); st.y = y; h = Math.max(h, stackH(st)); out.push(st); });
-    y += h + 10;
+  const pr = pinned.map(st => ({x:st.x, y:st.y, h:stackH(st)}));
+  const hitPin = (x, y, h) => pr.some(q => x < q.x + D.cw + 2 && x + D.cw > q.x - 2 && y < q.y + q.h + 2 && y + h > q.y - 2);
+  const out = pinned.slice();
+  let y = D.gap, col = 0, rowH = 0;
+  const nl = () => { y += rowH + 10; col = 0; rowH = 0; };
+  const place = st => {
+    const h = stackH(st);
+    for (let g = 0; g < 2000; g++) {
+      if (col >= 5) nl();
+      const x = D.gap + col * (D.cw + D.gap); col++;
+      if (hitPin(x, y, h)) continue;
+      st.x = x; st.y = y; rowH = Math.max(rowH, h); out.push(st); return;
+    }
+    st.x = D.gap; st.y = y; out.push(st);
   };
   const baseSt = places.find(st => st.cards[0].k === 'base');
-  const prow = places.filter(st => st !== baseSt);
-  for (let i = 0; i < prow.length; i += 5) row(prow.slice(i, i + 5));
-  const rest = (baseSt ? [baseSt] : []).concat(fixed, piles, mixed);
-  for (let i = 0; i < rest.length; i += 5) row(rest.slice(i, i + 5));
+  places.filter(st => st !== baseSt).forEach(place);
+  if (col > 0) nl();
+  (baseSt ? [baseSt] : []).concat(fixed, piles, mixed).forEach(place);
   S.stacks = out;
   if (!silent) { saveRun(); render(); }
 }
-
+function cardMenu(card) {
+  const st = stackOf(card); if (!st || S.dead) return;
+  const root = st.cards[0], d = K[root.k], pin = !!root.pin, n = st.cards.length;
+  $('#sheet').dataset.modal = '';
+  sheet(`<h2>${d.e} ${d.sn || d.n}${n > 1 ? ` <span class="muted">${allSame(st.cards) ? '×' + n : '더미 ' + n + '장'}</span>` : ''}${pin ? ' 📌' : ''}</h2>
+    <p class="muted">📌 고정하면 <b>정렬</b>을 눌러도 이 자리에 그대로 있어요. 고정한 카드도 끌어서 옮길 수 있고, 옮긴 새 자리에 고정돼요.</p>
+    <div class="btns"><button class="pri" data-act="pin" data-id="${root.id}">${pin ? '📌 고정 풀기' : '📌 이 자리에 고정'}</button><button data-close>닫기</button></div>`);
+}
 /* ---------- 그리기 ---------- */
 const els = new Map();
 function measure() {
@@ -1222,7 +1242,7 @@ function cardInner(c, st, i) {
   else if (d.closed) ft = '깨야 함';
   if (c.k === 'rotten') cls += ' rotten';
   if (pile && top) cls += ' pl';
-  return `<div class="${cls}"><div class="nm">${d.sn || d.n}</div><div class="em">${d.e}</div><div class="ft">${ft}</div>${bar >= 0 ? `<div class="br"><i style="width:${bar}%"></i></div>` : ''}${extra}${pile && top ? `<div class="badge" data-pile="1">×${n}</div>` : ''}</div>`;
+  return `<div class="${cls}"><div class="nm">${d.sn || d.n}</div><div class="em">${d.e}</div><div class="ft">${ft}</div>${bar >= 0 ? `<div class="br"><i style="width:${bar}%"></i></div>` : ''}${extra}${pile && top ? `<div class="badge" data-pile="1">×${n}</div>` : ''}</div>${top && st.cards[0].pin ? '<div class="pinb">📌</div>' : ''}`;
 }
 function render() {
   if (!S) return;
@@ -1231,6 +1251,7 @@ function render() {
   for (const st of S.stacks) {
     const pile = isPile(st);
     st.cards.forEach((c, i) => {
+      if (i > 0 && c.pin) delete c.pin; // 다른 더미 위로 올라가면 고정 풀림
       let el = els.get(c.id);
       const y = st.y + (pile ? Math.min(i, 4) * D.po : i * D.mo);
       const html = cardInner(c, st, i);
@@ -1284,7 +1305,7 @@ function thermoHTML() { // 〔v0.5 확정: 체온〕 온도계 칩 (추우면 �
 
 /* ---------- 포인터 (드래그 / 탭) ---------- */
 let drag = null;
-const DRAG_PX = 10, DRAG_PX_LIFT = 4, LIFT_MS = 220;
+const DRAG_PX = 10, DRAG_PX_LIFT = 4, LIFT_MS = 220, MENU_MS = 500;
 function fieldPt(e) { const r = $('#field').getBoundingClientRect(); return {x:e.clientX - r.left, y:e.clientY - r.top}; }
 function cardFromEl(el) {
   const id = +el.dataset.id;
@@ -1365,7 +1386,8 @@ function endPointer(e, cancel) {
   clearTimeout(d.liftT); if (d.liftEl) d.liftEl.classList.remove('lift');
   if (!d.moved) {
     drag = null;
-    if (!cancel && !d.lifted) onTap(d.card); // 짧게 누른 것만 탭 (꾹 누른 뒤 그냥 떼면 아무 일도 안 함)
+    if (!cancel && !d.lifted) onTap(d.card); // 짧게 누른 것만 탭
+    else if (!cancel && performance.now() - d.t0 >= MENU_MS) cardMenu(d.card); // 0.5초 꾹 눌렀다 제자리에서 떼면 카드 메뉴(📌 고정)
     return;
   }
   const target = cancel ? null : findTarget(e);
@@ -1668,7 +1690,7 @@ function showHelp() {
       <li>날생선·고인 빗물·강물은 배탈 위험 (탭하면 바로 먹어요). 🔥에 굽거나 끓이거나, 빗물 받이 물을 마셔요.</li>
       <li>🏝️ <b>갯벌</b>은 썰물(하루 2번, 2시간) 때만 열려요. 썰물 시각은 매일 1시간씩 늦어져요.</li>
       <li>⛈️ <b>7일마다 큰 폭풍</b>(12:00~다음 날 06:00), 비가 사흘 이어지면 작은 폭풍. 🛖 오두막(울타리 + 통나무 2 + 잎 3)이 없으면 체력 −8/시간(⛺ 바람막이 −3), 몸이 빠르게 식고 불이 꺼지고 시설 내구가 닳아요. 오두막 없이는 쉬어도 기운이 회복되지 않아요.</li>
-      <li><b>정렬</b> 버튼: 카드를 종류별로 모아 정리.</li>
+      <li><b>정렬</b> 버튼: 카드를 종류별로 모아 정리. 카드를 <b>0.5초 꾹 눌렀다 떼면 📌 고정</b> — 고정한 카드는 정렬해도 그 자리에 있어요 (끌어서 옮기면 새 자리에 고정).</li>
       <li>📜 <b>조합표</b>(아래 버튼)에 모든 조합이 처음부터 다 보여요. 지금 만들 수 있는 건 초록, 탭하면 필요한 카드가 반짝여요.</li>
       <li>💧 <b>물</b>: 🥥 코코넛(해변·정글, 🪨 돌로도 깸), ⛰️ 바위턱 웅덩이, 🪣 빗물 받이(잎+가지, 아침 이슬), 🏞️ 강(정글 탐사 50%)의 강물은 🔥에 끓여 마셔요.</li>
       <li>죽으면 생존 일수·처음 만든 조합·새 장소로 <b>각인 점수</b>를 얻어요.</li>
@@ -1753,6 +1775,7 @@ function showTraits() {
     <div class="btns"><button class="pri" data-act="go">출발 — ${SHIPS[pickShip].e} ${SHIPS[pickShip].n}${first ? '' : ' · ' + (pickNaked ? '맨몸' : pickTraits.map(id => TRAITS.find(t => t.id === id).n).join(', ') || '특성 없음')}</button></div>`);
 }
 const ACTIONS = {
+  pin(b) { const c = allCards().find(x => x.id === +b.dataset.id); if (!c) return closeSheet(); if (c.pin) delete c.pin; else c.pin = 1; saveRun(); closeSheet(); render(); toast(c.pin ? `📌 ${K[c.k].n} 고정 — 정렬해도 이 자리에 있어요` : `${K[c.k].n} 고정 풀림`); },
   craft() { showCraft(); },
   ctab(b) { showCraft(b.dataset.t); },
   ctap(b) { craftTap(+b.dataset.i); },
@@ -2536,7 +2559,7 @@ function showMate(m) {
     <span class="muted">한 번 맡기면 알아서 계속해요 (장소는 낮 06~18시 매시간, 모닥불은 밤에도 땔감). 배고프면 보드의 음식·물을 스스로 먹어요. 0인 채 24시간이면 떠나요.</span></p>
     <p>잘하는 일: ${c.job[i]}</p>
     <p>✦ 선장이 배우기: <b>${ab[0]}</b> — ${ab[1]}<br>${L_(c.id) ? '배움 완료 (이번 삶에서만)' : `${what} ${S.lc[c.id] || 0}/${need} (이 선원이 곁에 있을 때)`}</p>
-    <div class="btns"><button data-act="mateBase" data-id="${m.id}">🏕️ 기지로 보내기</button><button class="pri" data-close>닫기</button></div>`);
+    <div class="btns"><button data-act="mateBase" data-id="${m.id}">🏕️ 기지로 보내기</button><button data-act="pin" data-id="${(stackOf(m) || {cards:[m]}).cards[0].id}">${(stackOf(m) || {cards:[m]}).cards[0].pin ? '📌 고정 풀기' : '📌 고정'}</button><button class="pri" data-close>닫기</button></div>`);
 }
 /* --- 오프닝 --- */
 let introT = [];
@@ -2701,7 +2724,7 @@ function boot() {
   if (!meta.seenHelp) showHelp();
 }
 function sortBoardIfOff() { if (S.stacks.some(st => st.x + D.cw > D.W + 2)) sortBoard(true); }
-window.__game = {ctPlan, DROP_PAD, R:RATE, FUEL, easy, easyW, CT, ctState, showCraft, BOOK, tut:{TUT, tutCur, tutSteps, tutStart, tutEnd}, story:{CREW, mates, mateOf, crewHour, learn, endingFlow, finishEnding, DBG, showIntro, closeIntro, homeN, homeAll, pickCrew, SHIPS, END}, fi:(a, b) => fixedInteraction(a, b, stackOf(b)), snd:SND, tide:{open:() => flatOpen(), windows:tideWindows}, get S() { return S; }, get meta() { return meta; }, sortBoard, render, D, K, advance:(m) => { advance(m); after(); }};
+window.__game = {cardMenu, ctPlan, DROP_PAD, R:RATE, FUEL, easy, easyW, CT, ctState, showCraft, BOOK, tut:{TUT, tutCur, tutSteps, tutStart, tutEnd}, story:{CREW, mates, mateOf, crewHour, learn, endingFlow, finishEnding, DBG, showIntro, closeIntro, homeN, homeAll, pickCrew, SHIPS, END}, fi:(a, b) => fixedInteraction(a, b, stackOf(b)), snd:SND, tide:{open:() => flatOpen(), windows:tideWindows}, get S() { return S; }, get meta() { return meta; }, sortBoard, render, D, K, advance:(m) => { advance(m); after(); }};
 boot();
 </script>
 </body>
