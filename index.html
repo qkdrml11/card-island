@@ -117,11 +117,12 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
 .trait.hid{opacity:.55}
 .big{font-size:40px;text-align:center}
 .muted{color:#7a6a48;font-size:13px}
-#tut{flex:none;display:flex;align-items:center;gap:7px;background:#fff3c4;color:#3a2a00;padding:5px 8px;font-size:13.5px;font-weight:700;border-bottom:2px solid #d9a400;line-height:1.3;min-height:44px;touch-action:manipulation}
+#tut{flex:none;display:flex;align-items:center;gap:6px;background:#fff3c4;color:#3a2a00;padding:5px 7px;font-size:13px;font-weight:700;border-bottom:2px solid #d9a400;line-height:1.3;min-height:44px;touch-action:manipulation}
 #tut[hidden]{display:none}
-#tut .tn{flex:none;background:#c98f00;color:#fff;border-radius:9px;padding:1px 6px;font-size:11.5px}
-#tut .tt{flex:1}
-#tut button{flex:none;border:0;border-radius:9px;padding:4px 9px;font:inherit;font-size:12px;background:rgba(0,0,0,.09);color:#3a2a00;min-height:34px}
+#tut .tn{flex:none;background:#c98f00;color:#fff;border-radius:9px;padding:1px 5px;font-size:11px}
+#tut .tt{flex:1;letter-spacing:-.3px}
+#tut .hk{display:inline-block;background:#fff;border:1px solid #e0b100;border-radius:7px;padding:0 5px;font-size:12.5px;white-space:nowrap;letter-spacing:0}
+#tut button{flex:none;border:0;border-radius:9px;padding:4px 7px;font:inherit;font-size:11.5px;background:rgba(0,0,0,.09);color:#3a2a00;min-height:34px}
 #tut button.pri{background:#ffb703}
 #tut.pop{animation:tutpop .6s ease-out}
 @keyframes tutpop{0%{background:#ffd34d;transform:scale(.97)}100%{background:#fff3c4;transform:none}}
@@ -172,7 +173,7 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
 </div>
 <div id="toasts"></div>
 <div id="overlay" hidden><div id="sheet"></div></div>
-<div id="intro" hidden><div class="ln">폭풍이 지나간 아침. 파도가 나를 모래 위에 내려놓았다.</div><div class="ln">배도, 선원들도 보이지 않는다.</div><div class="ln">일곱 명. 한 명씩 찾는다.</div><div class="hint">탭하면 해변으로</div></div>
+<div id="intro" hidden><div class="ln">폭풍이 지나간 아침.</div><div class="ln">일곱 명. 한 명씩 찾는다.</div><div class="hint">탭</div></div>
 <script>
 'use strict';
 /* ====== 카드 무인도 프로토타입 (기획서 v0.3 기준, 수치는 임시값) ====== */
@@ -1356,7 +1357,7 @@ function showHelp() {
   $('#sheet').dataset.modal = '';
   sheet(`<h2>🏝️ 카드 무인도 — 프로토타입</h2>
     <ul>
-      <li>⚓ <b>선장</b>: 바다제비호의 선원 일곱이 섬 곳곳에 흩어졌어요. 시작할 때 배(🎣 어선 / 📦 운반선)를 고르면 시작 능력이 달라져요.</li>
+      <li>⚓ <b>선장</b>: 바다제비호의 선원 일곱이 섬 곳곳에 흩어졌어요. 시작할 때 배를 골라요.<br><small>${Object.values(SHIPS).map(sh => `${sh.e} ${sh.n}: ${sh.ab.join(' · ')}`).join('<br>')}</small></li>
       <li>👣 <b>선원 구조</b>: 장소를 살피다 흔적 카드가 나오면 <b>그 장소 카드 위에</b> 올려 찾아요(30분). 지친 선원에게 물이나 음식 1장을 올리면 동료가 돼요. 한 판에 살아 있는 선원은 3~4명, 나머지는 유품만 남아요.</li>
       <li>👥 <b>동료</b>: 동료 카드를 장소·🔥 모닥불·🏕️ 기지·🗼 신호대에 올리면 낮(06~18시) 동안 알아서 일해요(시간이 흘러야 함). 음식·물을 올려 먹여요 (0인 채 24시간이면 떠나요). 장소에 보낼 수 있는 동료는 2명(🛖 오두막 3명). 곁에 있는 선원의 일을 따라 하면 선장도 그 능력을 배워요 (이번 삶에서만).</li>
       <li>🏁 <b>엔딩 (임시)</b>: 🗼 신호대(통나무 2 + 잎 4 더미 → 기지) → 맑은 아침 지나가는 배 3번 → 🕯️ 횃불을 올려 연기 → 다음 맑은 아침 구조. 또는 🛶 뗏목(통나무 4 + 노끈 4 + 잎 2 더미 → 기지) → 큰 폭풍이 지난 다음 날 06~12시에 🌊 얕은 바다에 올려 출항 (물·구운 음식 필요). 데려간 선원 수에 따라 결말이 달라져요.</li>
@@ -1446,19 +1447,20 @@ function showTraits() {
   $('#sheet').dataset.modal = '1';
   const sl = slots();
   pickShip = pickShip || meta.lastShip || 'fish';
+  const first = !meta.lives && !Object.keys(meta.unlocked).length;
   sheet(`<h2>⚓ 바다제비호 — 배 고르기</h2>
-    <p class="muted">선원 일곱을 태운 바다제비호의 선장. 이번 항해는 어떤 배였나요?</p>
-    <div class="ship">${Object.entries(SHIPS).map(([id, sh]) => `<button data-act="ship" data-id="${id}" class="${pickShip === id ? 'on' : ''}"><b>${sh.e} ${sh.n}</b><small>${sh.d}</small>${sh.ab.map(a => `<small>${a}</small>`).join('')}</button>`).join('')}</div>
-    <h2 style="margin-top:14px">🌅 특성 고르기</h2>
-    <p>각인 점수 <b>✦ ${meta.points}</b> · 슬롯 <b>${pickTraits.length}/${sl}칸</b> <span class="muted">(최고 생존 ${meta.bestDays}일 · 7일 3칸, 14일 4칸)</span></p>
+    <div class="ship">${Object.entries(SHIPS).map(([id, sh]) => `<button data-act="ship" data-id="${id}" class="${pickShip === id ? 'on' : ''}" title="${sh.ab.join(' / ')}"><b>${sh.e} ${sh.n}</b><small>${sh.s}</small></button>`).join('')}</div>
+    ${first ? '' : '<h2 style="margin-top:14px">🌅 특성 고르기</h2>'}
+    ${first ? '' : `<p>각인 점수 <b>✦ ${meta.points}</b> · 슬롯 <b>${pickTraits.length}/${sl}칸</b> <span class="muted">(최고 생존 ${meta.bestDays}일 · 7일 3칸, 14일 4칸)</span></p>
     ${TRAITS.map(t => {
       const ap = meta.appeared[t.id], un = meta.unlocked[t.id], sel = pickTraits.includes(t.id);
-      if (!ap) return `<div class="trait hid"><div class="tx"><b>??? </b><br>등장 조건: ${t.cond}</div></div>`;
+      if (!ap) return '';
       return `<div class="trait ${sel ? 'sel' : ''}"><div class="tx"><b>${t.n}</b> ${un ? '' : `<span class="muted">(${t.cost}점)</span>`}<br>${t.d}</div>
         ${un ? `<button data-act="pick" data-id="${t.id}">${sel ? '빼기' : '고르기'}</button>` : `<button data-act="unlock" data-id="${t.id}" ${meta.points >= t.cost ? '' : 'disabled'}>해금 ${t.cost}점</button>`}</div>`;
     }).join('')}
-    <div class="trait ${pickNaked ? 'sel' : ''}"><div class="tx"><b>맨몸 시작</b><br>특성 없이 시작, 이번 삶 각인 점수 ×1.5</div><button data-act="naked">${pickNaked ? '끄기' : '켜기'}</button></div>
-    <div class="btns"><button class="pri" data-act="go">출발 — ${SHIPS[pickShip].e} ${SHIPS[pickShip].n} · ${pickNaked ? '맨몸' : pickTraits.map(id => TRAITS.find(t => t.id === id).n).join(', ') || '특성 없음'}</button></div>`);
+    ${TRAITS.some(t => !meta.appeared[t.id]) ? `<p class="muted">??? 특성 ${TRAITS.filter(t => !meta.appeared[t.id]).length}개 더 — 섬에서 무언가를 처음 해내면 나타나요.</p>` : ''}
+    <div class="trait ${pickNaked ? 'sel' : ''}"><div class="tx"><b>맨몸 시작</b><br>특성 없이 시작, 이번 삶 각인 점수 ×1.5</div><button data-act="naked">${pickNaked ? '끄기' : '켜기'}</button></div>`}
+    <div class="btns"><button class="pri" data-act="go">출발 — ${SHIPS[pickShip].e} ${SHIPS[pickShip].n}${first ? '' : ' · ' + (pickNaked ? '맨몸' : pickTraits.map(id => TRAITS.find(t => t.id === id).n).join(', ') || '특성 없음')}</button></div>`);
 }
 const ACTIONS = {
   snd() { SND.setOn(!SND.settings.on); syncSndBtn(); showMenu(true); },
@@ -1807,8 +1809,8 @@ function syncSndBtn() { const b = $('#bSnd'); if (b) b.textContent = SND.setting
 const QS = new URLSearchParams(location.search);
 const NOINTRO = QS.has('nointro'), DEBUG = QS.has('debug');
 const SHIPS = {
-  fish:{n:'어선', e:'🎣', d:'먹을 것에 강함 (생선 중심)', ab:['🎣 손에 밴 낚시: 창·낚싯대 성공률 +10%p', '🔺 선상 손질: 날 선 돌로도 생선 손질', '🐟 물고기 길목: 얕은 바다 물고기 최대 12→16, 하루 재생 +6→+8']},
-  cargo:{n:'운반선', e:'📦', d:'기지·항해에 강함', ab:['🏗️ 짐 부리는 손: 시설 짓는 시간 −25%', '🧱 단단히 묶기: 시설 최대 내구 +25%', '⛵ 배 다루는 법 (임시): 뗏목 노끈 4→3']},
+  fish:{n:'어선', e:'🎣', s:'낚시·생선에 강하다', d:'먹을 것에 강함 (생선 중심)', ab:['🎣 손에 밴 낚시: 창·낚싯대 성공률 +10%p', '🔺 선상 손질: 날 선 돌로도 생선 손질', '🐟 물고기 길목: 얕은 바다 물고기 최대 12→16, 하루 재생 +6→+8']},
+  cargo:{n:'운반선', e:'📦', s:'시설·뗏목에 강하다', d:'기지·항해에 강함', ab:['🏗️ 짐 부리는 손: 시설 짓는 시간 −25%', '🧱 단단히 묶기: 시설 최대 내구 +25%', '⛵ 배 다루는 법 (임시): 뗏목 노끈 4→3']},
 };
 const PLACE_JOB = ['beach','sea','flat','jungle','ledge'];
 // 선원 7명 (스토리 v0.2 3.3). 프로토에 없는 장소의 선원은 있는 장소로 옮김: 바늘 대나무 숲→바위턱, 달 동굴 아래쪽→얕은 바다, 할배 난파선→해변 80%, 윤 작은 무인도→바위턱 100%
@@ -1912,9 +1914,10 @@ function storySpawn(k, st) {
     if (!okc) continue;
     S.crew.st[c.id] = 'trace'; spawnNear(mk('cx_' + c.id), st); SND.q('discover');
     const tr = crewTr(c);
-    say(`👣 흔적 발견: ${tr[0]} ${tr[1]}. 이 카드를 ${K[k].e} ${K[k].n}에 올려 주인을 찾아보자.`, 'disc');
+    say(`👣 ${tr[0]} ${tr[1]} — ${K[k].e}에 올려 찾기`, 'disc');
     return;
   }
+  if (!meta.storyLives) return; // 첫 판에는 조각 0개 (스토리 v0.2 6.5·6.6)
   for (let i = 0; i < JOURNAL.length; i++) {
     const j = JOURNAL[i];
     if (j.at !== k || meta.pieces[j.id] || S.flags[j.id] || (i && !meta.pieces[JOURNAL[i - 1].id])) continue;
@@ -1936,7 +1939,7 @@ function searchTrace(card, placeSt) {
     if (alive) {
       const t = mk('ct_' + c.id); t.h = 20; t.w = 20; t.zero = 0;
       spawnAt(t, tst || placeSt); S.crew.st[c.id] = 'tired'; rosterOf(c.id).seen = 1; saveMeta(); SND.q('catch');
-      say(`😮‍💨 ${c.n}${josa(c.n, '을', '를')} 찾았다! 지쳐 쓰러져 있다. 물이나 음식 1장을 올려 주자.`, 'good');
+      say(`😮‍💨 ${c.n}${josa(c.n, '을', '를')} 찾았다. 지쳐 있다.`, 'good');
     } else {
       spawnAt(mk('cr_' + c.id), tst || placeSt); S.crew.st[c.id] = 'relic'; rosterOf(c.id).seen = 1; saveMeta();
       say(`${crewTr(c)[0]} 주인은 보이지 않는다… 유품을 찾았다. (탭해서 보기)`);
@@ -1954,7 +1957,7 @@ function feedCrew(food, cc) {
     if (isTired(cc)) {
       cc.k = 'cw_' + c.id; cc.h = Math.max(cc.h, 50); cc.w = Math.max(cc.w, 50); cc.job = 'base'; cc.workH = 0;
       S.crew.st[c.id] = 'mate'; rosterOf(c.id).met = 1; saveMeta(); SND.q('discover');
-      say(`🙌 ${c.n}${josa(c.n, '이', '가')} 정신을 차렸다! "선장님…!" — ${c.role[sIdx()]} ${c.n}, 동료가 됐다. 장소·🔥·🏕️ 기지에 올려 일을 맡겨 보자.`, 'disc');
+      say(`🙌 "선장님…!" ${c.role[sIdx()]} ${c.n}${josa(c.n, '이', '가')} 동료가 됐다.`, 'disc');
     } else say(`${d.e} ${c.n}에게 ${d.n}을(를) 줬다. 포만감 ${Math.round(cc.h)} · 수분 ${Math.round(cc.w)}`);
   });
 }
@@ -1976,7 +1979,7 @@ function assignJob(m, root) {
     if (n >= placeCap()) { toast(`장소에 데리고 다닐 수 있는 선원은 ${placeCap()}명이에요${hasHut() ? '' : ' (🛖 오두막이 있으면 3명)'}. 나머지는 🏕️ 기지·🔥 모닥불에서 일해요.`, 'bad'); SND.play('reject'); return render(); }
   }
   m.job = j; SND.play('stack');
-  say(`${c.e} ${c.n}: ${JOBNM[j]}에서 일한다. (낮 06~18시, 시간이 흘러야 일해요${j === 'fire' ? ' · 불 지키기는 밤에도' : ''})`);
+  say(`${c.e} ${c.n}: ${JOBNM[j]} 맡음 (낮에 일함)`);
   after();
 }
 function crewDrop(a, T) {
@@ -2206,14 +2209,14 @@ function showIntro() {
   const ls = el.querySelectorAll('.ln'); ls.forEach(x => x.classList.remove('on')); el.querySelector('.hint').classList.remove('on');
   SND.ensure(); setTimeout(() => SND.play('wave'), 50);
   introT.forEach(clearTimeout); introT = [];
-  ls.forEach((x, i) => introT.push(setTimeout(() => x.classList.add('on'), 2000 + i * 1000)));
-  introT.push(setTimeout(() => el.querySelector('.hint').classList.add('on'), 2000 + ls.length * 1000));
+  ls.forEach((x, i) => introT.push(setTimeout(() => x.classList.add('on'), 1200 + i * 900)));
+  introT.push(setTimeout(() => el.querySelector('.hint').classList.add('on'), 1200 + ls.length * 900));
 }
 function closeIntro() {
   const el = $('#intro'); if (el.hidden) return;
   if (performance.now() - (+el.dataset.at || 0) < 350) return;
   introT.forEach(clearTimeout); el.hidden = true;
-  if (S.tut) { tutPaint(); toast('🎓 위의 노란 안내를 따라 해 보세요. 반짝이는 카드가 다음 할 일이에요.'); }
+  if (S.tut) tutPaint();
   else if (!meta.seenHelp) showHelp(); else toast('🏖️ 해변을 탭해 보세요. 선원 일곱 명이 섬 어딘가에 있다.');
 }
 $('#intro').addEventListener('pointerup', closeIntro);
@@ -2263,42 +2266,46 @@ function tutCrew() {
   return al.find(id => !S.crew.st[id]) || al.find(id => S.crew.st[id] === 'trace') || al[0];
 }
 const tAliveTrace = () => S.crew && allCards().find(c => isTrace(c) && S.crew.alive.includes(cOf(c).id));
-// need: [kind 또는 판별식, 개수, 장소, 강제로 줄 카드, 이름]
+// need: [kind 또는 판별식, 개수, 장소, 강제로 줄 카드, 이모지]  ·  t = 선장 독백, h = 행동 힌트, g = 재료 모을 때 독백
+const tLeafPile = () => S.stacks.some(st => st.cards.length >= 2 && st.cards.every(c => c.k === 'leaf'));
+const tCooking = () => allCards().some(c => c.k === 'fire' && c.cook);
+const tCooked = () => allCards().some(c => COOKED.has(c.k));
 const TUT = [
-  {id:'sharp', t:'🪨 돌을 끌어 다른 🪨 돌 위에 → 🔺 날 선 돌', need:[['stone', 2, 'beach', 'stone', '🪨 돌']], hl:() => tKind('stone', 2), done:() => tHas('sharp') || tHas('knife')},
-  {id:'rope', t:'🌾 섬유를 다른 🌾 섬유 위에 → 🧶 노끈', need:[['fiber', 2, 'jungle', 'fiber', '🌾 섬유']], hl:() => tKind('fiber', 2), done:() => tHas('rope')},
-  {id:'drill', t:'🥢 가지를 다른 🥢 가지 위에 → 🌀 손드릴', need:[['stick', 2, 'jungle', 'stick', '🥢 나뭇가지']], hl:() => tKind('stick', 2), done:() => tHas('drill')},
-  {id:'ember', t:'🌀 손드릴을 🌾 섬유 위에 → ✨ 불씨', need:[['fiber', 1, 'jungle', 'fiber', '🌾 섬유'], ['stick', 1, 'jungle', 'stick', '🥢 나뭇가지 (모닥불용)']], hl:() => tKind('drill', 1).concat(tKind('fiber', 1)), done:() => tHas('ember') || tHas('fire') || tHas('firex')},
-  {id:'fire', t:'✨ 불씨를 🥢 가지 위에 → 🔥 모닥불 (불씨는 곧 꺼져요)', need:[['stick', 1, 'beach', 'stick', '🥢 나뭇가지']], hl:() => tKind('ember', 1).concat(tKind('stick', 1)), done:() => tHas('fire') || tHas('firex'),
-   alt:() => !tHas('ember') && {t:'✨ 불씨가 꺼졌어요. 🌀 손드릴을 🌾 섬유 위에 다시', need:[['fiber', 1, 'jungle', 'fiber', '🌾 섬유'], ['stick', 1, 'jungle', 'stick', '🥢 나뭇가지']], hl:() => tKind('drill', 1).concat(tKind('fiber', 1))}},
-  {id:'cook', t:'🐚 먹을 것을 🔥 모닥불 위에 → 20분 뒤 구운 음식', need:[[tRaw, 1, 'beach', 'clam', '🐚 먹을 것']], hl:() => tTops(tRaw, 1).concat(tKind('fire', 1)), done:() => allCards().some(c => COOKED.has(c.k) || (c.k === 'fire' && c.cook)) || S.tut.ev.eat},
-  {id:'eat', t:'🍽️ 구운 음식을 탭해서 먹기 (포만감 +)', hl:() => tTops(c => COOKED.has(c.k), 1).concat(tKind('fire', 1)), done:() => S.tut.ev.eat,
-   alt:() => !allCards().some(c => COOKED.has(c.k)) && allCards().some(c => c.k === 'fire' && c.cook) ? {t:'🔥 굽는 중… 🌴 정글을 살피면 시간이 흘러요', hl:() => tPlace('jungle').concat(tKind('fire', 1))}
-     : !allCards().some(c => COOKED.has(c.k) || (c.k === 'fire' && c.cook)) && {t:'🐚 먹을 것을 🔥 모닥불에 올려 구운 뒤 탭해서 먹기', need:[[tRaw, 1, 'beach', 'clam', '🐚 먹을 것']], hl:() => tTops(tRaw, 1).concat(tKind('fire', 1))}},
-  {id:'fuel', t:'🥢 가지를 🔥 모닥불 위에 → 연료 +2시간', need:[['stick', 1, 'beach', 'stick', '🥢 나뭇가지']], hl:() => tKind('stick', 1).concat(tKind('fire', 1)), done:() => S.tut.ev.fuel,
-   alt:() => tHas('firex') && !tHas('fire') && (tHas('ember') ? {t:'✨ 불씨를 🌫️ 꺼진 모닥불 위에 → 다시 불붙이기', need:null, hl:() => tKind('ember', 1).concat(tKind('firex', 1))}
-     : {t:'🌫️ 불이 꺼졌어요. 🌀 손드릴을 🌾 섬유 위에 → ✨ 불씨', need:[['fiber', 1, 'jungle', 'fiber', '🌾 섬유']], hl:() => tKind('drill', 1).concat(tKind('fiber', 1))})},
-  {id:'bed', t:() => S.stacks.some(st => st.cards.length >= 2 && st.cards.every(c => c.k === 'leaf')) ? '🍃 잎 더미의 ×2 표시를 잡고 🏕️ 기지 위에 → 🛏️ 침상' : '🍃 잎을 다른 🍃 잎 위에 겹쳐 더미 만들기', need:[['leaf', 2, 'jungle', 'leaf', '🍃 잎']], hl:() => tKind('leaf', 1).concat(tPlace('base')), done:() => tHas('bed') || tHas('windbreak')},
-  {id:'trace', story:1, t:() => { const c = CREWBY[tutCrew()]; return `${K[c.at].e} ${K[c.at].n}을 살펴 선원의 흔적 👣 찾기`; }, hl:() => tPlace(CREWBY[tutCrew()].at), done:() => !!tAliveTrace() || crewCards().length > 0},
-  {id:'search', story:1, t:() => { const tr = tAliveTrace(); const at = tr ? cOf(tr).at : 'beach'; return `👣 흔적 카드를 ${K[at].e} ${K[at].n} 카드 위에 → 주인 찾기`; }, hl:() => { const tr = tAliveTrace(); return tr ? [tr.id].concat(tPlace(cOf(tr).at)) : []; }, done:() => crewCards().length > 0,
-   alt:() => !tAliveTrace() && !crewCards().length && {t:'선원의 흔적 👣을 다시 찾아요', hl:() => tPlace(CREWBY[tutCrew()].at)}},
-  {id:'feed', story:1, t:'😮‍💨 지친 선원 위에 물이나 음식 1장 → 동료', need:[[tFeed, 1, 'beach', 'clam', '💧 물이나 🐚 음식']], hl:() => tTops(isTired, 1).concat(tTops(tFeed, 1)), done:() => tMates().length > 0},
-  {id:'job', story:1, t:'🙌 동료 카드를 🔥 모닥불이나 장소 위에 → 낮에 알아서 일해요', hl:() => tTops(isMate, 1).concat(tKind('fire', 1), tKind('firex', 1)), done:() => tMates().some(m => m.job && m.job !== 'base')},
-  {id:'goal', t:() => S.crew ? '🎯 목표: 🗼 신호대나 🛶 뗏목으로 섬을 떠나기 · 조합은 📖 도감' : '🎯 목표: 오래 살아남기 · 밤엔 🏕️ 기지를 탭해 쉬기 · 조합은 📖 도감', hl:() => tPlace('base'), done:() => false, end:1},
+  {id:'sharp', g:'배도, 선원도 없다.', t:'돌을 쳐서 날을 세운다.', h:'🪨 끌어 🪨 위에', need:[['stone', 2, 'beach', 'stone', '🪨']], hl:() => tKind('stone', 2), done:() => tHas('sharp') || tHas('knife')},
+  {id:'rope', g:'바다제비호는 어디 있나.', t:'섬유를 꼬아 줄을 만든다.', h:'🌾→🌾', need:[['fiber', 2, 'jungle', 'fiber', '🌾']], hl:() => tKind('fiber', 2), done:() => tHas('rope')},
+  {id:'drill', g:'일곱 명이 타고 있었다.', t:'가지 둘로 손드릴을.', h:'🥢→🥢', need:[['stick', 2, 'jungle', 'stick', '🥢']], hl:() => tKind('stick', 2), done:() => tHas('drill')},
+  {id:'ember', g:'해 지기 전에 불을.', t:'비비고, 또 비빈다.', h:'🌀→🌾', need:[['fiber', 1, 'jungle', 'fiber', '🌾'], ['stick', 1, 'jungle', 'stick', '🥢']], hl:() => tKind('drill', 1).concat(tKind('fiber', 1)), done:() => tHas('ember') || tHas('fire') || tHas('firex')},
+  {id:'fire', g:'땔감이 모자라다.', t:'불씨가 살아 있을 때.', h:'✨→🥢', need:[['stick', 1, 'beach', 'stick', '🥢']], hl:() => tKind('ember', 1).concat(tKind('stick', 1)), done:() => tHas('fire') || tHas('firex'),
+   alt:() => !tHas('ember') && {g:'불씨가 식었다.', t:'불씨가 식었다. 다시.', h:'🌀→🌾', need:[['fiber', 1, 'jungle', 'fiber', '🌾'], ['stick', 1, 'jungle', 'stick', '🥢']], hl:() => tKind('drill', 1).concat(tKind('fiber', 1))}},
+  {id:'cook', g:'속이 비었다.', t:'바다가 준 것을 굽는다.', h:'🐚→🔥', need:[[tRaw, 1, 'beach', 'clam', '🐚']], hl:() => tTops(tRaw, 1).concat(tKind('fire', 1)), done:() => tCooked() || tCooking() || S.tut.ev.eat},
+  {id:'eat', t:'따뜻한 걸 먹는다.', h:'구운 것 탭', hl:() => tTops(c => COOKED.has(c.k), 1), done:() => S.tut.ev.eat,
+   alt:() => tCooked() ? null : tCooking() ? {t:'익는 동안 둘러본다.', h:'🌴 탭', hl:() => tPlace('jungle').concat(tKind('fire', 1))}
+     : {g:'속이 비었다.', t:'다시 굽는다.', h:'🐚→🔥', need:[[tRaw, 1, 'beach', 'clam', '🐚']], hl:() => tTops(tRaw, 1).concat(tKind('fire', 1))}},
+  {id:'fuel', g:'땔감이 모자라다.', t:'불은 밤새 지켜야 한다.', h:'🥢→🔥', need:[['stick', 1, 'beach', 'stick', '🥢']], hl:() => tKind('stick', 1).concat(tKind('fire', 1)), done:() => S.tut.ev.fuel,
+   alt:() => tHas('firex') && !tHas('fire') && (tHas('ember') ? {t:'불씨를 옮겨 붙인다.', h:'✨→🌫️', need:null, hl:() => tKind('ember', 1).concat(tKind('firex', 1))}
+     : {g:'불이 꺼졌다.', t:'불이 꺼졌다. 다시.', h:'🌀→🌾', need:[['fiber', 1, 'jungle', 'fiber', '🌾']], hl:() => tKind('drill', 1).concat(tKind('fiber', 1))})},
+  {id:'bed', g:'누울 자리가 필요하다.', t:() => tLeafPile() ? '기지에 잠자리를 편다.' : '잎을 겹쳐 깐다.', h:() => tLeafPile() ? '×2 잡고→🏕️' : '🍃→🍃', need:[['leaf', 2, 'jungle', 'leaf', '🍃']], hl:() => tKind('leaf', 1).concat(tLeafPile() ? tPlace('base') : tKind('leaf', 2).slice(1)), done:() => tHas('bed') || tHas('windbreak')},
+  {id:'trace', story:1, t:'폭풍 밤, 다들 흩어졌다.', h:() => `${K[CREWBY[tutCrew()].at].e} 탭`, hl:() => tPlace(CREWBY[tutCrew()].at), done:() => !!tAliveTrace() || crewCards().length > 0},
+  {id:'search', story:1, t:() => { const tr = tAliveTrace(); if (!tr) return '흔적을 찾는다.'; const c = cOf(tr); return `${crewTr(c)[1]}. ${c.n}의 것이다.`; }, h:() => { const tr = tAliveTrace(); return tr ? `${crewTr(cOf(tr))[0]}→${K[cOf(tr).at].e}` : ''; }, hl:() => { const tr = tAliveTrace(); return tr ? [tr.id].concat(tPlace(cOf(tr).at)) : []; }, done:() => crewCards().length > 0,
+   alt:() => !tAliveTrace() && !crewCards().length && {t:'흔적을 다시 찾는다.', h:`${K[CREWBY[tutCrew()].at].e} 탭`, hl:() => tPlace(CREWBY[tutCrew()].at)}},
+  {id:'feed', story:1, g:'먹일 것이 없다.', t:() => { const m = allCards().find(isTired); return m ? `${cOf(m).n}${josa(cOf(m).n, '이', '')}다! 쓰러져 있다.` : '찾았다.'; }, h:() => { const m = allCards().find(isTired); return `💧·🐚→${m ? cOf(m).e : '👤'}`; }, need:[[tFeed, 1, 'beach', 'clam', '🐚']], hl:() => tTops(isTired, 1).concat(tTops(tFeed, 1)), done:() => tMates().length > 0},
+  {id:'job', story:1, t:() => { const m = tMates()[0]; return !m ? '' : cOf(m).id === 'sot' ? '솥에겐 불이 제자리다.' : `${cOf(m).n}에게 일을 맡긴다.`; }, h:() => { const m = tMates()[0]; return m ? `${cOf(m).e}→🔥` : ''; }, hl:() => tTops(isMate, 1).concat(tKind('fire', 1), tKind('firex', 1)), done:() => tMates().some(m => m.job && m.job !== 'base')},
+  {id:'goal', t:() => S.crew ? '일곱 모두 집에 보낸다.' : '오래 버틴다.', h:() => S.crew ? '🗼신호대·🛶뗏목 → 📖' : '밤엔 🏕️ 탭', hl:() => S.crew ? [] : tPlace('base'), done:() => false, end:1},
 ];
 const tutSteps = () => TUT.filter(s => !s.story || (S && S.crew));
 function tutCur() {
   if (!S || !S.tut || S.dead || S.pre) return null;
   const st = tutSteps()[S.tut.i]; if (!st) return null;
-  let v = {t:typeof st.t === 'function' ? st.t() : st.t, hl:st.hl, need:st.need};
+  let v = {t:st.t, h:st.h, g:st.g, hl:st.hl, need:st.need};
   const a = st.alt && st.alt(); if (a) v = Object.assign({}, v, a);
+  const f = x => typeof x === 'function' ? x() : (x || '');
   // 모자란 재료 → 모으는 안내로
   for (const [w, n, at, give, nm] of v.need || []) {
     if (!at) continue;
     const have = typeof w === 'function' ? allCards().filter(w).length : tN(w);
-    if (have < n) return {st, gather:{at, give, n, have}, t:`${K[at].e} ${K[at].n}을 탭해서 살펴보기 (${nm} ${have}/${n})`, hl:() => tPlace(at)};
+    if (have < n) return {st, gather:{at, give, n, have}, t:f(v.g) || f(v.t), h:`${K[at].e} 탭 ${nm}${have}/${n}`, hl:() => tPlace(at)};
   }
-  return Object.assign({st}, v);
+  return Object.assign({st}, v, {t:f(v.t), h:f(v.h)});
 }
 function tutDrop(k) { const c = tutCur(); return c && c.gather && c.gather.at === k ? c.gather.give : null; }
 const tutFire = () => { const c = tutCur(); return !!c && ['ember', 'fire', 'fuel'].includes(c.st.id); };
@@ -2316,14 +2323,14 @@ function tutCheck(quiet) {
 }
 function tutEnd(skip) {
   S.tut = null; meta.tutDone = 1; saveMeta(); saveRun(); tutPaint(); render();
-  toast(skip ? '튜토리얼을 건너뛰었어요. ⋯ 메뉴나 📖 도감에서 다시 볼 수 있어요.' : '🎓 튜토리얼 끝! 조합은 📖 도감에 남아 있어요. 행운을 빌어요, 선장님.', skip ? '' : 'good');
+  toast(skip ? '안내는 ⋯ 메뉴에서 다시 볼 수 있어요.' : '🎓 조합은 📖 도감에 있어요.', skip ? '' : 'good');
 }
 function tutPaint() {
   const el = $('#tut'), c = tutCur();
   document.querySelectorAll('.card.tut-hl').forEach(x => x.classList.remove('tut-hl'));
   if (!c) { if (!el.hidden) { el.hidden = true; measure(); } return; }
   const steps = tutSteps(), i = S.tut.i;
-  const html = `<span class="tn">${i + 1}/${steps.length}</span><span class="tt">${c.t}</span>${c.st.end ? '<button data-tut="end" class="pri">끝</button>' : '<button data-tut="skip">건너뛰기</button>'}`;
+  const html = `<span class="tn">${i + 1}/${steps.length}</span><span class="tt">${c.t}${c.h ? ` <b class="hk">${c.h}</b>` : ''}</span>${c.st.end ? '<button data-tut="end" class="pri">끝</button>' : '<button data-tut="skip">건너뛰기</button>'}`;
   if (el._h !== html) { el.innerHTML = html; el._h = html; if (S.tut.flash) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); delete S.tut.flash; } }
   if (el.hidden) { el.hidden = false; measure(); }
   for (const id of (c.hl ? c.hl() : [])) { const ce = els.get(id); if (ce) ce.classList.add('tut-hl'); }
