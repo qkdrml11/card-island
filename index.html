@@ -117,6 +117,20 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
 .trait.hid{opacity:.55}
 .big{font-size:40px;text-align:center}
 .muted{color:#7a6a48;font-size:13px}
+#tut{flex:none;display:flex;align-items:center;gap:7px;background:#fff3c4;color:#3a2a00;padding:5px 8px;font-size:13.5px;font-weight:700;border-bottom:2px solid #d9a400;line-height:1.3;min-height:44px;touch-action:manipulation}
+#tut[hidden]{display:none}
+#tut .tn{flex:none;background:#c98f00;color:#fff;border-radius:9px;padding:1px 6px;font-size:11.5px}
+#tut .tt{flex:1}
+#tut button{flex:none;border:0;border-radius:9px;padding:4px 9px;font:inherit;font-size:12px;background:rgba(0,0,0,.09);color:#3a2a00;min-height:34px}
+#tut button.pri{background:#ffb703}
+#tut.pop{animation:tutpop .6s ease-out}
+@keyframes tutpop{0%{background:#ffd34d;transform:scale(.97)}100%{background:#fff3c4;transform:none}}
+.card.tut-hl .ci{animation:tutglow .8s ease-in-out infinite alternate!important}
+@keyframes tutglow{from{box-shadow:0 0 0 2px #ffc400,0 0 5px 2px rgba(255,196,0,.55)}to{box-shadow:0 0 0 4px #ffc400,0 0 16px 6px rgba(255,196,0,.95)}}
+.card.tut-hl::after{content:'👇';position:absolute;top:-5px;right:-4px;font-size:20px;line-height:1;animation:tutbob .6s ease-in-out infinite alternate;pointer-events:none;z-index:5;filter:drop-shadow(0 1px 1px rgba(0,0,0,.4))}
+@keyframes tutbob{from{transform:translateY(-3px)}to{transform:translateY(3px)}}
+#sheet .rcp.ess{opacity:.8}
+#sheet .rcp .tag{font-size:11px;background:#ffe08a;border-radius:6px;padding:0 5px;margin-left:4px;font-weight:700}
 .c-crew{background:#e7e2ff;border-color:#5a4bb0}
 .c-crew .ft{font-size:calc(var(--cw)*.13)}
 .c-story{background:#f3ead6;border-color:#8a6d3b;border-style:dashed}
@@ -146,6 +160,7 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
     <div class="r1"><span id="clock">1일차 07:00</span><span id="dn" class="chip">☀️ 낮</span><span id="wx" class="chip">맑음</span><span id="fx"></span><span class="sp"></span><button id="bSnd" class="chip" aria-label="소리 켜기/끄기">🔊</button><span id="pts" class="chip">✦ 0</span></div>
     <div id="bars"></div>
   </header>
+  <div id="tut" hidden></div>
   <main id="board"><div id="field"></div></main>
   <footer id="toolbar">
     <button id="bSort" class="pri">정렬</button>
@@ -317,7 +332,7 @@ let pending = [];
 function loadMeta() {
   let m = null;
   try { m = JSON.parse(localStorage.getItem(META_KEY) || 'null'); } catch (e) {}
-  return Object.assign({points:0, discovered:{}, appeared:{stone:1}, unlocked:{}, bestDays:0, places:{}, lives:0, lastTraits:[], seenHelp:0, roster:{}, endings:{}, endMethod:{}, pieces:{}, storyLives:0, lastShip:'fish'}, m || {});
+  return Object.assign({points:0, discovered:{}, appeared:{stone:1}, unlocked:{}, bestDays:0, places:{}, lives:0, lastTraits:[], seenHelp:0, roster:{}, endings:{}, endMethod:{}, pieces:{}, storyLives:0, lastShip:'fish', tutDone:0}, m || {});
 }
 function saveMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch (e) {} }
 function saveRun() { if (S && S.pre) return; try { localStorage.setItem(RUN_KEY, JSON.stringify(S)); } catch (e) {} }
@@ -337,7 +352,7 @@ function mk(k) {
   if (d.spoil) c.sp = S.t + d.spoil;
   if (k === 'fire') c.fuel = 180;
   if (k === 'catcher') c.water = 0;
-  if (k === 'ember') c.exp = S.t + 30;
+  if (k === 'ember') c.exp = S.t + (S.tut ? 60 : 30);
   if (k === 'compost') c.items = [];
   if (FAC[k]) c.fd = fmax(k);
   return c;
@@ -358,6 +373,7 @@ function newGame(traits, naked, ship, pre) {
   if (hasTrait('map')) for (const k of ['beach','sea','jungle','ledge']) S.places[k].exp = 30;
   sortBoard(true);
   logMsg(ship ? `1일차 07:00, 폭풍이 지나간 아침. 바다제비호(${SHIPS[ship].n})의 선장으로 해변에서 눈을 떴다.` : '1일차 07:00, 해변에서 눈을 떴다.');
+  if (!pre && (QS.has('tut') || (!NOINTRO && !meta.tutDone))) { tutStart(true); meta.seenHelp = 1; saveMeta(); }
   saveRun();
 }
 function addStack(cards, x, y) { const st = {id:'s' + (S.nid++), x, y, cards}; S.stacks.push(st); return st; }
@@ -624,6 +640,7 @@ function act(min, e, fn, mode) {
 function after() {
   checkPlaces();
   if (S.crew) crewGainFlush();
+  if (S.tut) tutCheck();
   if (S.pendingEnd && !S.dead) { const pe = S.pendingEnd; delete S.pendingEnd; if (pe.type === 'rescue') { saveRun(); render(); flush(); return endingFlow('rescue', mates().map(m => cOf(m).id)); } }
   if (S.dead) die();
   saveRun(); render(); flush();
@@ -695,7 +712,9 @@ function explore(card) {
       roll -= pr;
     }
     if (!got && L_('kong') && rnd() < .03) { const rare = dropTable(k).slice(k === 'flat' ? 2 : 3).filter(([, , pool]) => P.pools[pool][0] > 0); if (rare.length) { const [rk, , pool] = rare[Math.floor(rnd() * rare.length)]; P.pools[pool][0]--; got = rk; } }
-    if (got) { spawnNear(mk(got), st); say(`${K[k].e} 살피기 → ${K[got].e} ${K[got].n}`); }
+    const tg = tutDrop(k); if (tg) got = tg;
+    const lp = tg === 'leaf' && S.stacks.find(s2 => !FIXED.has(s2.cards[0].k) && s2.cards.every(c => c.k === 'leaf'));
+    if (got) { if (lp) lp.cards.push(mk(got)); else spawnNear(mk(got), st); say(`${K[k].e} 살피기 → ${K[got].e} ${K[got].n}`); }
     else say(`${K[k].e} 살피기 → 빈손`);
     storySpawn(k, st);
     if (S.flags.bait && (k === 'sea' || k === 'beach')) { delete S.flags.bait; spawnNear(mk('crab'), st); SND.q('catch'); say('🦀 버린 찌꺼기 냄새를 맡고 게가 몰려왔다! +게', 'good'); }
@@ -726,6 +745,7 @@ function eat(card) {
   const verb = d.cat === 'water' ? '마셨다' : '먹었다';
   removeCards([card]);
   act(5, 0, () => {
+    if (S.tut && COOKED.has(card.k)) S.tut.ev.eat = 1;
     SND.q(d.cat === 'water' ? 'drink' : 'eat');
     const hh = (d.eat.h || 0) + (L_('sot') && COOKED.has(card.k) ? 5 : 0);
     if (hh) S.hunger = clamp(S.hunger + hh);
@@ -814,7 +834,7 @@ function fixedInteraction(a, b, bst) {
       return {run:() => { removeCards([a]); b.cook = {k:ak, until:S.t + 20}; SND.q('stack'); learn('sot'); say(`${K[ak].e} ${K[ak].n}을(를) 불에 올렸다. 20분 뒤 익음 (다른 행동·쉬기로 시간이 흘러야 함)`); after(); }};
     }
     if (ak === 'stick' || ak === 'plank' || ak === 'log') {
-      return {run:() => { const add = ak === 'log' ? 360 : 120; removeCards([a]); b.fuel = Math.min(720, b.fuel + add); discover('fuel'); SND.q('fuel'); say(`🔥 연료 +${add / 60}시간 (남은 연료 ${fmtH(b.fuel)})`); after(); }};
+      return {run:() => { const add = ak === 'log' ? 360 : 120; removeCards([a]); b.fuel = Math.min(720, b.fuel + add); discover('fuel'); if (S.tut) S.tut.ev.fuel = 1; SND.q('fuel'); say(`🔥 연료 +${add / 60}시간 (남은 연료 ${fmtH(b.fuel)})`); after(); }};
     }
     if (ak === 'torchx' || (ak === 'torch' && a.dur < 4)) {
       return {e:0, run:() => { act(5, 0, () => { a.k = 'torch'; a.dur = 4; discover('relight'); SND.q('ignite'); say('🕯️ 횃불이 다시 붙었다 (내구 4).', 'good'); }); }};
@@ -823,7 +843,7 @@ function fixedInteraction(a, b, bst) {
     return {msg:'불에 올릴 수 없는 카드예요.'};
   }
   if (bk === 'firex') {
-    if (ak === 'ember') return {e:1, run:() => { removeCards([a]); act(10, 1, () => { b.k = 'fire'; b.fuel = 180; discover('relightfire'); SND.q('ignite'); say('🔥 모닥불을 다시 피웠다 (연료 3시간).', 'good'); }); }};
+    if (ak === 'ember') return {e:1, run:() => { removeCards([a]); act(10, 1, () => { b.k = 'fire'; b.fuel = 180; discover('relightfire'); if (S.tut) S.tut.ev.fuel = 1; SND.q('ignite'); say('🔥 모닥불을 다시 피웠다 (연료 3시간).', 'good'); }); }};
     return null;
   }
   if (bk === 'signal' && (ak === 'ember' || (ak === 'torch' && a.dur > 0))) return lightSignal(a, b);
@@ -863,7 +883,7 @@ function toolPair(tool, item, ist) {
     return {e:3, run:() => act(20, 3, () => {
       wear(tool);
       const p = hasTrait('firehand') ? 1 : (isWet() ? .4 : .7);
-      if (rnd() < p) { SND.q('ignite'); removeCards([item]); spawnAt(mk('ember'), ist); discover('ember'); appear('firehand'); say('✨ 불씨가 일었다! 30분 안에 써야 해요.', 'good'); }
+      if (tutFire() || rnd() < p) { SND.q('ignite'); removeCards([item]); spawnAt(mk('ember'), ist); discover('ember'); appear('firehand'); say('✨ 불씨가 일었다! 30분 안에 써야 해요.', 'good'); }
       else { SND.q('fizzle'); say('🌀 불씨 실패… (손드릴 내구 −1, 섬유는 남음)', 'bad'); }
     })};
   if ((tk === 'knife' && (ik === 'fish' || ik === 'crab')) || (tk === 'sharp' && ik === 'fish' && S.ship === 'fish'))
@@ -1153,6 +1173,7 @@ function render() {
   for (const [id, el] of els) if (!seen.has(id)) { el.remove(); els.delete(id); }
   field.style.height = Math.max(D.H, fieldH() + D.cellH) + 'px';
   renderHud();
+  tutPaint();
 }
 function renderHud() {
   SND.update(S);
@@ -1314,12 +1335,15 @@ function showBook(tab) {
   const tabs = `<div class="tabs"><button data-act="book" data-tab="rcp" class="${tab === 'rcp' ? 'on' : ''}">📖 조합</button><button data-act="book" data-tab="crew" class="${tab === 'crew' ? 'on' : ''}">⚓ 선원 명부</button><button data-act="book" data-tab="story" class="${tab === 'story' ? 'on' : ''}">📔 이야기</button></div>`;
   if (tab !== 'rcp') { $('#sheet').dataset.modal = ''; sheet(tabs + (tab === 'crew' ? `<h2>⚓ 선원 명부</h2>${rosterHTML()}` : storyHTML()) + '<div class="btns"><button data-close>닫기</button></div>'); return; }
   const known = BOOK.filter(b => meta.discovered[b[0]]);
-  const sil = BOOK.filter(b => !meta.discovered[b[0]] && b[4] && meta.discovered[b[4]]);
-  const hidden = BOOK.length - known.length - sil.length;
+  const ess = BOOK.filter(b => !meta.discovered[b[0]] && ESSENTIAL.includes(b[0]));
+  const sil = BOOK.filter(b => !meta.discovered[b[0]] && !ESSENTIAL.includes(b[0]) && b[4] && meta.discovered[b[4]]);
+  const hidden = BOOK.length - known.length - sil.length - ess.length;
   $('#sheet').dataset.modal = '';
   sheet(tabs + `<h2>📖 조합 도감 <span class="muted">${known.length}/${BOOK.length}</span></h2>
-    <p class="muted">알아낸 조합은 죽어도 남습니다.</p>
-    ${known.map(b => `<div class="rcp"><span class="e">${b[1]}</span><div><b>${b[2]}</b><small>${b[3]}</small></div></div>`).join('') || '<p>아직 알아낸 조합이 없어요. 카드를 겹쳐 보세요!</p>'}
+    <p class="muted">알아낸 조합은 죽어도 남습니다. <b>🎓 기본</b> 표시는 꼭 필요한 조합이라 처음부터 보여요.</p>
+    <div class="btns" style="margin:4px 0 8px"><button data-act="tutReplay">🎓 튜토리얼 다시 보기</button></div>
+    ${known.map(b => `<div class="rcp"><span class="e">${b[1]}</span><div><b>${b[2]}</b>${ESSENTIAL.includes(b[0]) ? '<span class="tag">🎓 기본</span>' : ''}<small>${b[3]}</small></div></div>`).join('') || '<p>아직 알아낸 조합이 없어요. 카드를 겹쳐 보세요!</p>'}
+    ${ess.map(b => `<div class="rcp ess"><span class="e">${b[1]}</span><div><b>${b[2]}</b><span class="tag">🎓 기본</span> <span class="muted">아직 안 해 봄</span><small>${b[3]}</small></div></div>`).join('')}
     ${sil.map(b => `<div class="rcp unk"><span class="e">${b[1]}</span><div><b>???</b><small>앞 단계를 만들어 본 조합 · 재료 숨김</small></div></div>`).join('')}
     ${hidden > 0 ? `<p class="muted">아직 실루엣도 보이지 않는 조합 ${hidden}개</p>` : ''}
     <div class="btns"><button data-close>닫기</button></div>`);
@@ -1373,6 +1397,7 @@ function showMenu(keep) {
     ${S && S.ship ? `<p class="muted">⚓ ${SHIPS[S.ship].e} ${SHIPS[S.ship].n} · 동료 ${mates().length}명 · 집으로 보낸 선원 ${homeN()}/7</p>` : `<p class="muted">⚓ 이 삶은 예전 방식이에요. 포기하고 다음 삶을 시작하면 배를 고르고 선원 이야기가 시작돼요.</p>`}
     ${sndMenuHTML()}
     ${DEBUG ? `<h3>🛠 디버그</h3><div class="btns"><button data-act="dbg" data-f="roster">명부 7명 귀환으로 채우기</button><button data-act="dbg" data-f="rosterClear">명부·엔딩 기록 비우기</button><button data-act="dbg" data-f="traces">남은 흔적 카드 모두 꺼내기</button><button data-act="dbg" data-f="feed">선원 배부르게</button><button data-act="dbg" data-f="signal">신호대 + 항로 기록 3 + 횃불</button><button data-act="dbg" data-f="escape">뗏목·보급품 + 폭풍 다음 날 아침</button></div>` : ''}
+    <div class="btns"><button data-act="tutReplay">🎓 튜토리얼 다시 보기</button></div>
     <div class="btns"><button data-act="giveup">이번 삶 포기 (정산)</button><button data-act="wipe">전체 기록 초기화</button><button data-close>닫기</button></div>`;
   if (keep) $('#sheet').innerHTML = html; else sheet(html);
 }
@@ -1449,6 +1474,13 @@ const ACTIONS = {
     const g = $('#sheet [data-act="go"]'); if (g) g.textContent = g.textContent.replace(/(🎣 어선|📦 운반선)/, `${SHIPS[pickShip].e} ${SHIPS[pickShip].n}`);
   },
   book(b) { showBook(b.dataset.tab); },
+  tutReplay() {
+    closeSheet();
+    if (!S || S.pre) return;
+    if (S.dead) { meta.tutDone = 0; saveMeta(); return toast('🎓 다음 삶을 시작하면 튜토리얼이 처음부터 나와요.'); }
+    S.tut = {i:0, ev:{}}; tutCheck(true); saveRun(); render();
+    toast('🎓 튜토리얼을 다시 켰어요. 이미 해낸 단계는 건너뛰어요.');
+  },
   keepStory(b) { const c = allCards().find(x => x.id === +b.dataset.id); closeSheet(); if (!c) return; if (JOURNAL.some(j => j.id === c.k)) { meta.pieces[c.k] = 1; saveMeta(); say(`📔 ${K[c.k].n}을(를) 보관했다 (📖 도감 → 이야기).`); } else say(`${K[c.k].e} ${K[c.k].n}을(를) 챙겼다. ⚓ 선원 명부에 기록.`); removeCards([c]); after(); },
   mateBase(b) { const m = allCards().find(x => x.id === +b.dataset.id); closeSheet(); if (m) { m.job = 'base'; say(`${cOf(m).n}: 🏕️ 기지에서 대기한다.`); after(); } },
   depart() {
@@ -1474,6 +1506,7 @@ $('#bBook').addEventListener('click', () => showBook());
 $('#bLog').addEventListener('click', showLog);
 $('#bHelp').addEventListener('click', showHelp);
 $('#bMenu').addEventListener('click', () => showMenu());
+$('#toolbar').addEventListener('click', e => { if (S && S.pre) { e.stopImmediatePropagation(); e.preventDefault(); toast('먼저 배를 고르고 출발하세요.'); } }, true);
 $('#bSnd').addEventListener('click', () => { SND.setOn(!SND.settings.on); syncSndBtn(); toast(SND.settings.on ? '🔊 소리 켬' : '🔇 소리 끔'); });
 document.addEventListener('touchmove', e => { if (drag) e.preventDefault(); }, {passive:false});
 document.addEventListener('gesturestart', e => e.preventDefault());
@@ -1875,7 +1908,7 @@ function storySpawn(k, st) {
   if (!S.crew) return;
   for (const c of CREW) {
     if (c.at !== k || S.crew.st[c.id]) continue;
-    const okc = k === 'flat' ? S.flatN >= c.flatN : S.places[k].exp >= c.exp;
+    const okc = tutTrace(c.id) || (k === 'flat' ? S.flatN >= c.flatN : S.places[k].exp >= c.exp);
     if (!okc) continue;
     S.crew.st[c.id] = 'trace'; spawnNear(mk('cx_' + c.id), st); SND.q('discover');
     const tr = crewTr(c);
@@ -2180,7 +2213,8 @@ function closeIntro() {
   const el = $('#intro'); if (el.hidden) return;
   if (performance.now() - (+el.dataset.at || 0) < 350) return;
   introT.forEach(clearTimeout); el.hidden = true;
-  if (!meta.seenHelp) showHelp(); else toast('🏖️ 해변을 탭해 보세요. 선원 일곱 명이 섬 어딘가에 있다.');
+  if (S.tut) { tutPaint(); toast('🎓 위의 노란 안내를 따라 해 보세요. 반짝이는 카드가 다음 할 일이에요.'); }
+  else if (!meta.seenHelp) showHelp(); else toast('🏖️ 해변을 탭해 보세요. 선원 일곱 명이 섬 어딘가에 있다.');
 }
 $('#intro').addEventListener('pointerup', closeIntro);
 /* --- 도감 탭: 명부·이야기 --- */
@@ -2214,6 +2248,91 @@ const DBG = {
   feed() { for (const c of crewCards()) { c.h = 90; c.w = 90; c.zero = 0; } after(); },
 };
 
+/* ---------- 튜토리얼 (첫 판 단계별 안내) ---------- */
+const tN = k => allCards().filter(c => c.k === k).length;
+const tHas = k => tN(k) > 0;
+const tTops = (pred, max = 9) => S.stacks.filter(st => pred(st.cards[st.cards.length - 1])).slice(0, max).map(st => st.cards[st.cards.length - 1].id);
+const tKind = (k, max) => tTops(c => c.k === k, max);
+const tPlace = k => { const st = placeSt(k); return st ? [st.cards[0].id] : []; };
+const tRaw = c => K[c.k].cook && !isMate(c) && !isTired(c);
+const tFeed = c => canFeed(c) && !isMate(c) && !isTired(c);
+const tMates = () => S.crew ? mates() : [];
+function tutCrew() {
+  if (!S.crew) return null;
+  const al = S.crew.alive.filter(id => CREWBY[id].at !== 'flat');
+  return al.find(id => !S.crew.st[id]) || al.find(id => S.crew.st[id] === 'trace') || al[0];
+}
+const tAliveTrace = () => S.crew && allCards().find(c => isTrace(c) && S.crew.alive.includes(cOf(c).id));
+// need: [kind 또는 판별식, 개수, 장소, 강제로 줄 카드, 이름]
+const TUT = [
+  {id:'sharp', t:'🪨 돌을 끌어 다른 🪨 돌 위에 → 🔺 날 선 돌', need:[['stone', 2, 'beach', 'stone', '🪨 돌']], hl:() => tKind('stone', 2), done:() => tHas('sharp') || tHas('knife')},
+  {id:'rope', t:'🌾 섬유를 다른 🌾 섬유 위에 → 🧶 노끈', need:[['fiber', 2, 'jungle', 'fiber', '🌾 섬유']], hl:() => tKind('fiber', 2), done:() => tHas('rope')},
+  {id:'drill', t:'🥢 가지를 다른 🥢 가지 위에 → 🌀 손드릴', need:[['stick', 2, 'jungle', 'stick', '🥢 나뭇가지']], hl:() => tKind('stick', 2), done:() => tHas('drill')},
+  {id:'ember', t:'🌀 손드릴을 🌾 섬유 위에 → ✨ 불씨', need:[['fiber', 1, 'jungle', 'fiber', '🌾 섬유'], ['stick', 1, 'jungle', 'stick', '🥢 나뭇가지 (모닥불용)']], hl:() => tKind('drill', 1).concat(tKind('fiber', 1)), done:() => tHas('ember') || tHas('fire') || tHas('firex')},
+  {id:'fire', t:'✨ 불씨를 🥢 가지 위에 → 🔥 모닥불 (불씨는 곧 꺼져요)', need:[['stick', 1, 'beach', 'stick', '🥢 나뭇가지']], hl:() => tKind('ember', 1).concat(tKind('stick', 1)), done:() => tHas('fire') || tHas('firex'),
+   alt:() => !tHas('ember') && {t:'✨ 불씨가 꺼졌어요. 🌀 손드릴을 🌾 섬유 위에 다시', need:[['fiber', 1, 'jungle', 'fiber', '🌾 섬유'], ['stick', 1, 'jungle', 'stick', '🥢 나뭇가지']], hl:() => tKind('drill', 1).concat(tKind('fiber', 1))}},
+  {id:'cook', t:'🐚 먹을 것을 🔥 모닥불 위에 → 20분 뒤 구운 음식', need:[[tRaw, 1, 'beach', 'clam', '🐚 먹을 것']], hl:() => tTops(tRaw, 1).concat(tKind('fire', 1)), done:() => allCards().some(c => COOKED.has(c.k) || (c.k === 'fire' && c.cook)) || S.tut.ev.eat},
+  {id:'eat', t:'🍽️ 구운 음식을 탭해서 먹기 (포만감 +)', hl:() => tTops(c => COOKED.has(c.k), 1).concat(tKind('fire', 1)), done:() => S.tut.ev.eat,
+   alt:() => !allCards().some(c => COOKED.has(c.k)) && allCards().some(c => c.k === 'fire' && c.cook) ? {t:'🔥 굽는 중… 🌴 정글을 살피면 시간이 흘러요', hl:() => tPlace('jungle').concat(tKind('fire', 1))}
+     : !allCards().some(c => COOKED.has(c.k) || (c.k === 'fire' && c.cook)) && {t:'🐚 먹을 것을 🔥 모닥불에 올려 구운 뒤 탭해서 먹기', need:[[tRaw, 1, 'beach', 'clam', '🐚 먹을 것']], hl:() => tTops(tRaw, 1).concat(tKind('fire', 1))}},
+  {id:'fuel', t:'🥢 가지를 🔥 모닥불 위에 → 연료 +2시간', need:[['stick', 1, 'beach', 'stick', '🥢 나뭇가지']], hl:() => tKind('stick', 1).concat(tKind('fire', 1)), done:() => S.tut.ev.fuel,
+   alt:() => tHas('firex') && !tHas('fire') && (tHas('ember') ? {t:'✨ 불씨를 🌫️ 꺼진 모닥불 위에 → 다시 불붙이기', need:null, hl:() => tKind('ember', 1).concat(tKind('firex', 1))}
+     : {t:'🌫️ 불이 꺼졌어요. 🌀 손드릴을 🌾 섬유 위에 → ✨ 불씨', need:[['fiber', 1, 'jungle', 'fiber', '🌾 섬유']], hl:() => tKind('drill', 1).concat(tKind('fiber', 1))})},
+  {id:'bed', t:() => S.stacks.some(st => st.cards.length >= 2 && st.cards.every(c => c.k === 'leaf')) ? '🍃 잎 더미의 ×2 표시를 잡고 🏕️ 기지 위에 → 🛏️ 침상' : '🍃 잎을 다른 🍃 잎 위에 겹쳐 더미 만들기', need:[['leaf', 2, 'jungle', 'leaf', '🍃 잎']], hl:() => tKind('leaf', 1).concat(tPlace('base')), done:() => tHas('bed') || tHas('windbreak')},
+  {id:'trace', story:1, t:() => { const c = CREWBY[tutCrew()]; return `${K[c.at].e} ${K[c.at].n}을 살펴 선원의 흔적 👣 찾기`; }, hl:() => tPlace(CREWBY[tutCrew()].at), done:() => !!tAliveTrace() || crewCards().length > 0},
+  {id:'search', story:1, t:() => { const tr = tAliveTrace(); const at = tr ? cOf(tr).at : 'beach'; return `👣 흔적 카드를 ${K[at].e} ${K[at].n} 카드 위에 → 주인 찾기`; }, hl:() => { const tr = tAliveTrace(); return tr ? [tr.id].concat(tPlace(cOf(tr).at)) : []; }, done:() => crewCards().length > 0,
+   alt:() => !tAliveTrace() && !crewCards().length && {t:'선원의 흔적 👣을 다시 찾아요', hl:() => tPlace(CREWBY[tutCrew()].at)}},
+  {id:'feed', story:1, t:'😮‍💨 지친 선원 위에 물이나 음식 1장 → 동료', need:[[tFeed, 1, 'beach', 'clam', '💧 물이나 🐚 음식']], hl:() => tTops(isTired, 1).concat(tTops(tFeed, 1)), done:() => tMates().length > 0},
+  {id:'job', story:1, t:'🙌 동료 카드를 🔥 모닥불이나 장소 위에 → 낮에 알아서 일해요', hl:() => tTops(isMate, 1).concat(tKind('fire', 1), tKind('firex', 1)), done:() => tMates().some(m => m.job && m.job !== 'base')},
+  {id:'goal', t:() => S.crew ? '🎯 목표: 🗼 신호대나 🛶 뗏목으로 섬을 떠나기 · 조합은 📖 도감' : '🎯 목표: 오래 살아남기 · 밤엔 🏕️ 기지를 탭해 쉬기 · 조합은 📖 도감', hl:() => tPlace('base'), done:() => false, end:1},
+];
+const tutSteps = () => TUT.filter(s => !s.story || (S && S.crew));
+function tutCur() {
+  if (!S || !S.tut || S.dead || S.pre) return null;
+  const st = tutSteps()[S.tut.i]; if (!st) return null;
+  let v = {t:typeof st.t === 'function' ? st.t() : st.t, hl:st.hl, need:st.need};
+  const a = st.alt && st.alt(); if (a) v = Object.assign({}, v, a);
+  // 모자란 재료 → 모으는 안내로
+  for (const [w, n, at, give, nm] of v.need || []) {
+    if (!at) continue;
+    const have = typeof w === 'function' ? allCards().filter(w).length : tN(w);
+    if (have < n) return {st, gather:{at, give, n, have}, t:`${K[at].e} ${K[at].n}을 탭해서 살펴보기 (${nm} ${have}/${n})`, hl:() => tPlace(at)};
+  }
+  return Object.assign({st}, v);
+}
+function tutDrop(k) { const c = tutCur(); return c && c.gather && c.gather.at === k ? c.gather.give : null; }
+const tutFire = () => { const c = tutCur(); return !!c && ['ember', 'fire', 'fuel'].includes(c.st.id); };
+const tutTrace = id => { const c = tutCur(); return !!c && (c.st.id === 'trace' || c.st.id === 'search') && id === tutCrew(); };
+function tutStart(fresh) {
+  S.tut = {i:0, ev:{}};
+  if (fresh && day() === 1) S.rain = false;
+  tutCheck(true); tutPaint();
+}
+function tutCheck(quiet) {
+  if (!S || !S.tut || S.dead) return;
+  const steps = tutSteps(); let moved = false;
+  while (S.tut.i < steps.length && !steps[S.tut.i].end && steps[S.tut.i].done()) { S.tut.i++; moved = true; }
+  if (moved && !quiet) { SND.q('discover'); S.tut.flash = 1; }
+}
+function tutEnd(skip) {
+  S.tut = null; meta.tutDone = 1; saveMeta(); saveRun(); tutPaint(); render();
+  toast(skip ? '튜토리얼을 건너뛰었어요. ⋯ 메뉴나 📖 도감에서 다시 볼 수 있어요.' : '🎓 튜토리얼 끝! 조합은 📖 도감에 남아 있어요. 행운을 빌어요, 선장님.', skip ? '' : 'good');
+}
+function tutPaint() {
+  const el = $('#tut'), c = tutCur();
+  document.querySelectorAll('.card.tut-hl').forEach(x => x.classList.remove('tut-hl'));
+  if (!c) { if (!el.hidden) { el.hidden = true; measure(); } return; }
+  const steps = tutSteps(), i = S.tut.i;
+  const html = `<span class="tn">${i + 1}/${steps.length}</span><span class="tt">${c.t}</span>${c.st.end ? '<button data-tut="end" class="pri">끝</button>' : '<button data-tut="skip">건너뛰기</button>'}`;
+  if (el._h !== html) { el.innerHTML = html; el._h = html; if (S.tut.flash) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); delete S.tut.flash; } }
+  if (el.hidden) { el.hidden = false; measure(); }
+  for (const id of (c.hl ? c.hl() : [])) { const ce = els.get(id); if (ce) ce.classList.add('tut-hl'); }
+}
+$('#tut').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || !S || !S.tut) return;
+  if (b.dataset.tut === 'skip' || b.dataset.tut === 'end') tutEnd(b.dataset.tut === 'skip');
+});
+const ESSENTIAL = ['sharp','rope','drill','ember','campfire','cook_clamc','bed','rescue','signal','raft'];
 /* ---------- 시작 ---------- */
 function boot() {
   measure();
@@ -2236,7 +2355,7 @@ function boot() {
   if (!meta.seenHelp) showHelp();
 }
 function sortBoardIfOff() { if (S.stacks.some(st => st.x + D.cw > D.W + 2)) sortBoard(true); }
-window.__game = {story:{CREW, mates, mateOf, crewHour, learn, endingFlow, finishEnding, DBG, showIntro, closeIntro, homeN, homeAll, pickCrew, SHIPS, END}, fi:(a, b) => fixedInteraction(a, b, stackOf(b)), snd:SND, tide:{open:() => flatOpen(), windows:tideWindows}, get S() { return S; }, get meta() { return meta; }, sortBoard, render, D, K, advance:(m) => { advance(m); after(); }};
+window.__game = {tut:{TUT, tutCur, tutSteps, tutStart, tutEnd}, story:{CREW, mates, mateOf, crewHour, learn, endingFlow, finishEnding, DBG, showIntro, closeIntro, homeN, homeAll, pickCrew, SHIPS, END}, fi:(a, b) => fixedInteraction(a, b, stackOf(b)), snd:SND, tide:{open:() => flatOpen(), windows:tideWindows}, get S() { return S; }, get meta() { return meta; }, sortBoard, render, D, K, advance:(m) => { advance(m); after(); }};
 boot();
 </script>
 </body>
