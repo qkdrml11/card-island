@@ -306,7 +306,7 @@ function mk(k) {
 function maxDur(c) { return K[c.k].dur + (c.k === 'drill' && hasTrait('firehand') ? 3 : 0); }
 
 function newGame(traits, naked) {
-  S = {v:VERSION, t:420, hp:100, energy:100, hunger:20, thirst:20, sick:0, injured:0, rain:false, rainStreak:0, storm:0, stormStart:0, stormEnd:0,
+  S = {v:VERSION, st100:1, t:420, hp:100, energy:100, hunger:80, thirst:80, sick:0, injured:0, rain:false, rainStreak:0, storm:0, stormStart:0, stormEnd:0,
        stacks:[], places:initPools(), nid:1, dead:false, scored:false, lastCause:'',
        life:{traits:traits || [], naked:!!naked, surv:0, storms:0, newRecipes:[], newPlaces:[]}, log:[], flags:{}};
   for (const k of PLACE_ORDER) addStack([mk(k)], 0, 0);
@@ -394,12 +394,13 @@ function advance(min, mode = 'awake') {
     S.t++;
     const m = mod();
     const sleepy = rest && !S.storm; // 폭풍 중에는 잠을 못 자서 깨어 있을 때 속도
-    S.hunger = clamp(S.hunger + (sleepy ? 2 : 4) / 60);
+    // 〔v0.5 확정: 상태 100 기준〕 hunger = 포만감, thirst = 수분 (100 = 가득, 시간이 지나면 줄어듦, 0이면 체력 감소)
+    S.hunger = clamp(S.hunger - (sleepy ? 2 : 4) / 60);
     let th = (sleepy ? 2 : 5) / 60;
     if (S.sick > 0) { th *= 2; S.sick--; if (!S.sick) say('배탈이 가라앉았다.'); }
-    S.thirst = clamp(S.thirst + th);
-    if (S.hunger >= 100) dmg(4 / 60, '굶주림');
-    if (S.thirst >= 100) dmg(6 / 60, '목마름');
+    S.thirst = clamp(S.thirst - th);
+    if (S.hunger <= 0) dmg(4 / 60, '굶주림');
+    if (S.thirst <= 0) dmg(6 / 60, '탈수');
     if (S.injured > 0) { dmg(2 / 60, '부상'); S.injured--; if (!S.injured) say('부상이 나았다.', 'good'); }
     if (rest) {
       const rr = restRate(); let r = rr.r;
@@ -408,10 +409,11 @@ function advance(min, mode = 'awake') {
         if (isNight()) r *= 1.25;
         if (S.rain && !rr.hut) r *= rr.wb ? .75 : .5;
       }
-      if (S.hunger >= 80 || S.thirst >= 80) r *= .5;
+      if (S.hunger <= 20 || S.thirst <= 20) r *= .5;
       S.energy = clamp(S.energy + r / 60);
-      if (S.hunger < 70 && S.thirst < 70 && (!S.storm || rr.hut)) S.hp = clamp(S.hp + (rr.hut ? 4 : 2) / 60);
+      if (S.hunger > 30 && S.thirst > 30 && (!S.storm || rr.hut)) S.hp = clamp(S.hp + (rr.hut ? 4 : 2) / 60);
     }
+    if (S.energy <= 0) dmg(3 / 60, '탈진'); // 〔v0.5 확정〕 기운 0 → 체력 −3/시간
     tickCards();
     stormMinute();
     if (isTideStart(S.t)) { const p = S.places.flat.pools.all; p[0] = p[1]; if (!S.storm) say(`🏝️ 썰물! 갯벌이 열렸다 (${clockStr(S.t + 120)}까지)`); }
@@ -489,7 +491,7 @@ function nightBeast() {
 /* ---------- 행동 ---------- */
 function canAct(e) {
   if (S.dead) return false;
-  if (e > 0 && S.energy <= 0) { toast('기운이 없어요. 🏕️ 기지를 탭해서 쉬세요.', 'bad'); return false; }
+  if (e > 0 && S.energy <= 0) { toast('기운이 없어요 (기운 0이면 체력이 줄어요). 🏕️ 기지를 탭해서 쉬세요.', 'bad'); return false; }
   return true;
 }
 function act(min, e, fn, mode) {
@@ -518,9 +520,9 @@ function appear(tid) {
   say(`✦ 새 특성 등장: ${t.n} (다음 삶부터 각인 점수로 해금)`, 'disc');
 }
 function getSick() {
-  S.thirst = clamp(S.thirst + 20); S.energy = clamp(S.energy - 15); S.sick = 360;
+  S.thirst = clamp(S.thirst - 20); S.energy = clamp(S.energy - 15); S.sick = 360;
   SND.q('sick');
-  say('🤢 배탈이 났다! 목마름 +20, 기운 −15, 6시간 동안 목마름 2배', 'bad');
+  say('🤢 배탈이 났다! 수분 −20, 기운 −15, 6시간 동안 수분이 2배로 빨리 줄어듦', 'bad');
   appear('stomach');
 }
 function wear(c) {
@@ -598,16 +600,16 @@ function eat(card) {
   removeCards([card]);
   act(5, 0, () => {
     SND.q(d.cat === 'water' ? 'drink' : 'eat');
-    if (d.eat.h) S.hunger = clamp(S.hunger - d.eat.h);
-    if (d.eat.t) S.thirst = clamp(S.thirst - d.eat.t);
-    say(`${d.e} ${d.n}을(를) ${verb}.${d.eat.h ? ' 배고픔 −' + d.eat.h : ''}${d.eat.t ? ' 목마름 −' + d.eat.t : ''}`);
+    if (d.eat.h) S.hunger = clamp(S.hunger + d.eat.h);
+    if (d.eat.t) S.thirst = clamp(S.thirst + d.eat.t);
+    say(`${d.e} ${d.n}을(를) ${verb}.${d.eat.h ? ' 포만감 +' + d.eat.h : ''}${d.eat.t ? ' 수분 +' + d.eat.t : ''}`);
     if (d.eat.sick) { const p = d.eat.sick * (hasTrait('stomach') ? .5 : 1); if (rnd() < p) getSick(); }
   });
 }
 function drinkCatcher(card) {
   if (!card.water) return toast('🪣 빗물 받이가 비어 있어요. 비가 오면 2시간마다 1잔씩 찹니다.');
   card.water--;
-  act(5, 0, () => { SND.q('drink'); S.thirst = clamp(S.thirst - 25); say('🪣 빗물을 마셨다. 목마름 −25'); });
+  act(5, 0, () => { SND.q('drink'); S.thirst = clamp(S.thirst + 25); say('🪣 빗물을 마셨다. 수분 +25'); });
 }
 
 /* ---------- 쉬기 ---------- */
@@ -620,10 +622,10 @@ function openRest() {
   let mult = [];
   if (S.storm) mult.push(rr.hut ? '폭풍: 오두막 안 +8/시간' : '폭풍: 회복 없음, 체력 −5/시간');
   else { if (n) mult.push('밤 ×1.25'); if (S.rain && !rr.hut) mult.push(rr.wb ? '비 ×0.75' : '비 ×0.5'); }
-  if (S.hunger >= 80 || S.thirst >= 80) mult.push('배고픔/목마름 80↑ ×0.5');
+  if (S.hunger <= 20 || S.thirst <= 20) mult.push('포만감/수분 20↓ ×0.5');
   sheet(`<h2>🏕️ 기지에서 쉬기</h2>
     <p>자리: <b>${rr.nm}</b> (기운 +${rr.r}/시간${mult.length ? ', ' + mult.join(', ') : ''})<br>
-    <span class="muted">쉬는 동안 배고픔 +2, 목마름 +2 /시간. 배고픔·목마름 둘 다 70 미만이면 체력 +2/시간.</span></p>
+    <span class="muted">쉬는 동안 포만감 −2, 수분 −2 /시간. 포만감·수분 둘 다 30 초과면 체력 +2/시간.</span></p>
     <div class="btns">
       <button class="pri" data-rest="60">1시간 쉬기</button>
       <button data-rest="180">3시간 쉬기</button>
@@ -949,7 +951,7 @@ function cardInner(c, st, i) {
   else if (c.k === 'humus') ft = '농사용<br>(다음 빌드)';
   else if (c.k === 'rotten') ft = '먹으면 배탈<br>🌊에 버리기';
   else if (c.sp) { const h = Math.max(0, Math.ceil((c.sp - S.t) / 60)); ft = `${d.raw ? '날것 · ' : ''}${h}시간 뒤<br>상함`; }
-  else if (d.eat) { ft = [d.eat.h ? `배고픔−${d.eat.h}` : '', d.eat.t ? `목마름−${d.eat.t}` : ''].filter(Boolean).join('<br>'); if (d.eat.sick && d.eat.sick < 1) ft += '<br>⚠ 배탈 위험'; }
+  else if (d.eat) { ft = [d.eat.h ? `포만감+${d.eat.h}` : '', d.eat.t ? `수분+${d.eat.t}` : ''].filter(Boolean).join('<br>'); if (d.eat.sick && d.eat.sick < 1) ft += '<br>⚠ 배탈 위험'; }
   else if (d.closed) ft = '깨야 함';
   if (c.k === 'rotten') cls += ' rotten';
   if (pile && top) cls += ' pl';
@@ -1000,9 +1002,9 @@ function renderHud() {
   if (S.injured > 0) fx += `<span class="chip warn">🩹 부상</span>`;
   $('#fx').innerHTML = fx;
   $('#pts').textContent = `✦ ${meta.points}`;
-  const bars = [['체력', S.hp, '#e2574c', false], ['배고픔', S.hunger, '#f0a030', true], ['목마름', S.thirst, '#3d9be0', true], ['기운', S.energy, '#e8c93a', false]];
-  $('#bars').innerHTML = bars.map(([l, v, col, inv]) => {
-    const bad = inv ? v >= 80 : v <= 20;
+  const bars = [['체력', S.hp, '#e2574c'], ['포만감', S.hunger, '#f0a030'], ['수분', S.thirst, '#3d9be0'], ['기운', S.energy, '#e8c93a']]; // 넷 다 100 = 가득, 20 이하 위험
+  $('#bars').innerHTML = bars.map(([l, v, col]) => {
+    const bad = v <= 20;
     return `<div class="bar2 ${bad ? 'bad' : ''}"><span class="lb">${l}</span><span class="tr"><i style="width:${v}%;background:${bad ? '#ff6b4f' : col}"></i></span><span class="v">${Math.round(v)}</span></div>`;
   }).join('');
 }
@@ -1097,7 +1099,7 @@ function confirmRotten(card) {
   $('#sheet').dataset.modal = '';
   const p = Math.round(100 * (hasTrait('stomach') ? .5 : 1));
   sheet(`<h2>🤢 상한 음식이에요. 그래도 먹을까요?</h2>
-    <p class="muted">배고픔 −3, 배탈 확률 ${p}%. 버리려면 🌊 얕은 바다나 🪱 퇴비 더미에 끌어다 놓으세요.</p>
+    <p class="muted">포만감 +3, 배탈 확률 ${p}%. 버리려면 🌊 얕은 바다나 🪱 퇴비 더미에 끌어다 놓으세요.</p>
     <div class="btns"><button class="danger" data-act="eatRotten" data-id="${card.id}">먹기</button><button class="pri" data-close>취소</button></div>`);
 }
 function onTap(card) {
@@ -1163,6 +1165,7 @@ function showHelp() {
       <li>도구는 장소·카드 위에 올려서 써요. 🌴 정글←날 선 돌(통나무), 🌊 얕은 바다←창·낚싯대, 🥥←날 선 돌.</li>
       <li>음식을 🔥 모닥불에 올리면 20분 뒤 익어요 (다른 행동이나 쉬기로 시간이 흘러야 함).</li>
       <li><b>시간은 행동할 때만 흘러요.</b> 생각하는 시간은 공짜.</li>
+      <li>상태 4개(체력·포만감·수분·기운)는 <b>100이 가득</b>이에요. 포만감·수분은 시간이 지나면 줄고, 먹고 마시면 차요. <b>포만감·수분·기운이 0이 되면 체력이 깎여요.</b> 20 이하가 되면 막대가 빨개져요.</li>
       <li>밤(18:00~06:00)에는 횃불 없이 해변·갯벌(썰물 때)만 살필 수 있어요. 밤에는 멧돼지가 올 수 있어요 (음식이 있으면 더 자주, 모닥불이 있으면 덜, 🚧 울타리·🛖 오두막이 있으면 안 와요).</li>
       <li>날생선·고인 빗물은 배탈 위험 (탭하면 바로 먹어요). 굽거나 빗물 받이 물을 마셔요.</li>
       <li>🏝️ <b>갯벌</b>은 썰물(하루 2번, 2시간) 때만 열려요. 썰물 시각은 매일 1시간씩 늦어져요.</li>
@@ -1494,7 +1497,7 @@ const SND = (() => {
     mix.thunder = mix.storm ? 1.6 : ((d % 7 === 6 && m >= 1020) || (d % 7 === 0 && m >= 360 && m < 720)) ? 1 : 0;
     mix.dead = S.dead ? 1 : 0;
     // 상태 위험 경고: 위험 구간에 새로 들어갈 때만
-    const dg = {hp:S.hp <= 20, hunger:S.hunger >= 80, thirst:S.thirst >= 80, energy:S.energy <= 20};
+    const dg = {hp:S.hp <= 20, hunger:S.hunger <= 20, thirst:S.thirst <= 20, energy:S.energy <= 20};
     if (prevDanger && !S.dead && Object.keys(dg).some(k => dg[k] && !prevDanger[k])) q('warn');
     prevDanger = dg;
     apply();
@@ -1562,6 +1565,7 @@ function boot() {
   try { run = JSON.parse(localStorage.getItem(RUN_KEY) || 'null'); } catch (e) {}
   if (run && run.v === VERSION) {
     S = run;
+    if (!S.st100) { S.hunger = 100 - S.hunger; S.thirst = 100 - S.thirst; S.st100 = 1; saveRun(); } // 〔v0.5〕 상태 100 기준으로 옮기기
     if (S.dead) { render(); showDeath(); return; }
     sortBoardIfOff(); render();
   } else { newGame(meta.unlocked.stone && meta.lastTraits ? meta.lastTraits.filter(id => meta.unlocked[id]) : [], false); render(); }
