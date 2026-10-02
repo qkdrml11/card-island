@@ -64,6 +64,7 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
 .ci .ft{font-size:calc(var(--cw)*.138);line-height:1.15;margin-top:3px;text-align:center;font-weight:600;opacity:.85;padding:0 2px;letter-spacing:-.3px}
 .ci .br{position:absolute;left:6px;right:6px;bottom:4px;height:4px;background:rgba(0,0,0,.15);border-radius:3px;overflow:hidden}
 .ci .br i{display:block;height:100%;background:#3c9d5d}
+.ci.frail .br i{background:#e2574c} .ci.frail .ft{color:#c0392b;font-weight:700}
 .ci.pl .em{margin-right:24px}
 .ci .badge{position:absolute;right:2px;top:25px;min-width:30px;height:26px;line-height:26px;padding:0 5px;border-radius:12px;
   background:#1d2b2f;color:#fff;font-size:13px;font-weight:800;text-align:center}
@@ -181,6 +182,16 @@ const K = {
   compost:{n:'퇴비 더미',e:'🪱',cat:'fac'}, humus:{n:'퇴비',e:'🟤',cat:'res'},
 };
 const KORDER = Object.keys(K);
+/* 〔v0.5 확정: 시설 내구도·보수〕 시설 내구도 (임시값): max = 최대, storm = 큰 폭풍 1시간당 감소 (작은 폭풍은 절반), fix = 올리면 늘어나는 내구 */
+const FAC = {
+  bed:{max:9, storm:3, fix:{leaf:3}},
+  windbreak:{max:20, storm:2, fix:{leaf:5, stick:5, rope:10}},
+  fence:{max:30, storm:1.5, fix:{log:10, stick:3}},
+  hut:{max:40, storm:1, fix:{log:10, leaf:4}},
+  catcher:{max:10, storm:1, fix:{leaf:5, stick:5}},
+};
+const fdOf = c => c.fd === undefined ? FAC[c.k].max : c.fd;
+const fixList = k => Object.entries(FAC[k].fix).map(([m, v]) => `${K[m].e}${K[m].n} +${v}`).join(', ');
 const FIXED = new Set(['beach','sea','flat','jungle','ledge','base','valley','cave','fire','firex','bed','catcher','windbreak','fence','hut','compost']);
 // 버리기(🌊 얕은 바다): 도구·장소·시설·불은 못 버림 / 퇴비 더미에 넣을 수 있는 것
 const canDiscard = c => !FIXED.has(c.k) && !['tool','place','fac'].includes(K[c.k].cat);
@@ -232,11 +243,11 @@ const BOOK = [
   ['cook_fishc','🍢','구운 생선','🐟 생선 → 🔥 모닥불 (20분)','campfire'],
   ['cook_fishkc','🍱','손질 생선구이','🐠 손질한 생선 → 🔥 모닥불 (20분)','cleanfish'],
   ['cook_eggc','🍳','구운 새알','🥚 새알 → 🔥 모닥불 (20분)','campfire'],
-  ['bed','🛏️','침상','🍃 잎 ×2 더미 → 🏕️ 기지에 올리기 · 쉬기 기운 +8/시간'],
-  ['catcher','🪣','빗물 받이','🍃 잎 ×2 + 🥢 나뭇가지 더미 → 🏕️ 기지에 올리기 · 비 2시간마다 물 1잔 (최대 3)'],
-  ['windbreak','⛺','바람막이','🛏️ 침상 위에 🧶 노끈 + 🥢 나뭇가지 ×2 (또는 그 더미를 🏕️ 기지에) · 쉬기 +9, 비 피해 절반, 비에 몸이 안 식음, 폭풍 피해 절반','bed'],
-  ['fence','🚧','울타리','🪵 통나무 ×3 더미 → 🏕️ 기지에 올리기 · 밤짐승 차단','chop'],
-  ['hut','🛖','오두막','🚧 울타리 위에 🪵 통나무 ×2 + 🍃 잎 ×3 (또는 그 더미를 🏕️ 기지에) · 폭풍 차단, 쉬기 +12, 밤 추위 막음, 안에서 쉬면 몸이 데워짐','fence'],
+  ['bed','🛏️','침상','🍃 잎 ×2 더미 → 🏕️ 기지에 올리기 · 쉬기 기운 +8/시간 · 내구 9 (🍃 잎으로 보수)'],
+  ['catcher','🪣','빗물 받이','🍃 잎 ×2 + 🥢 나뭇가지 더미 → 🏕️ 기지에 올리기 · 비 2시간마다 물 1잔 (최대 3) · 내구 10'],
+  ['windbreak','⛺','바람막이','🛏️ 침상 위에 🧶 노끈 + 🥢 나뭇가지 ×2 (또는 그 더미를 🏕️ 기지에) · 쉬기 +9, 비 피해 절반, 비에 몸이 안 식음, 폭풍 피해 줄임 · 내구 20 (🍃·🥢·🧶로 보수)','bed'],
+  ['fence','🚧','울타리','🪵 통나무 ×3 더미 → 🏕️ 기지에 올리기 · 밤짐승 차단 · 내구 30 (🪵로 보수)','chop'],
+  ['hut','🛖','오두막','🚧 울타리 위에 🪵 통나무 ×2 + 🍃 잎 ×3 (또는 그 더미를 🏕️ 기지에) · 폭풍 차단, 쉬기 +12, 밤 추위 막음, 안에서 쉬면 몸이 데워짐 · 내구 40 (🪵·🍃로 보수)','fence'],
   ['compost','🪱','퇴비 더미','🥢 나뭇가지 ×2 + 🍃 잎 ×2 더미 → 🏕️ 기지에 올리기 · 상한 음식 처리'],
   ['humus','🟤','퇴비','🤢 상한 음식 / 🦴 생선뼈 / 🌱 해초 → 🪱 퇴비 더미 · 24시간 뒤 (최대 3개 동시) · 농사용(다음 빌드)','compost'],
   ['discard','🌊','버리기','필요 없는 카드 → 🌊 얕은 바다 (도구·장소·시설 제외) · 상한 음식·생선뼈는 가끔 게를 부름'],
@@ -306,6 +317,7 @@ function mk(k) {
   if (k === 'catcher') c.water = 0;
   if (k === 'ember') c.exp = S.t + 30;
   if (k === 'compost') c.items = [];
+  if (FAC[k]) c.fd = FAC[k].max;
   return c;
 }
 function maxDur(c) { return K[c.k].dur + (c.k === 'drill' && hasTrait('firehand') ? 3 : 0); }
@@ -367,7 +379,7 @@ function startStorm(type, end) {
     if (c.k === 'catcher') c.water = 0;
     if (c.k === 'fire' && !hasHut()) extinguish(c, st, '폭풍에');
   }
-  say(`⛈️ ${type === 'big' ? '큰 폭풍' : '폭풍'}이 몰아친다! (${whenStr(end)}까지)${hasHut() ? ' 오두막 안은 안전하다.' : ' 오두막이 없으면 체력이 깎이고 몸이 식는다. 3시간 뒤 침상이 부서진다.'}`, 'bad');
+  say(`⛈️ ${type === 'big' ? '큰 폭풍' : '폭풍'}이 몰아친다! (${whenStr(end)}까지)${hasHut() ? ' 오두막 안은 안전하다.' : ' 오두막이 없으면 체력이 깎이고 몸이 식는다. 시설 내구도가 줄어드니 재료를 올려 보수하자.'}`, 'bad');
 }
 function endStorm() {
   S.storm = 0; S.life.storms = (S.life.storms || 0) + 1;
@@ -377,17 +389,27 @@ function endStorm() {
 function stormMinute() {
   const d = day(), m = mod();
   if (S.storm && S.t >= S.stormEnd) endStorm();
+  if (S.storm) facWear();
   if (d % 7 === 0 && m === 720) startStorm('big', S.t + 1080);
   if (S.storm && !hasHut()) {
-    // 〔v0.5 확정: 체온·폭풍 강화〕 오두막 없음 체력 −8/시간, 바람막이가 있으면 −4/시간 (폭풍 감각 절반). 바람막이는 부서지지 않고 침상만 부서짐
-    dmg((findKind('windbreak') ? 4 : 8) / 60 * (hasTrait('stormsense') ? .5 : 1), '폭풍');
-    if (S.t - S.stormStart === 180) {
-      const wreck = allCards().filter(c => c.k === 'bed');
-      if (wreck.length) { removeCards(wreck); say(`🌪️ 폭풍에 ${wreck.map(c => K[c.k].n).join('·')}이(가) 부서졌다.`, 'bad'); SND.q('break'); }
-    }
+    // 〔v0.5 확정: 체온·폭풍 강화〕 오두막 없음 체력 −8/시간, 바람막이가 있으면 −3/시간 (〔v0.5 확정: 시설 내구도·보수〕 −4 → −3) (폭풍 감각 절반). 〔v0.5 확정: 시설 내구도·보수〕 시설은 내구도가 다 닳으면 부서짐 (facWear)
+    dmg((findKind('windbreak') ? 3 : 8) / 60 * (hasTrait('stormsense') ? .5 : 1), '폭풍');
     if (m % 60 === 0) for (const st of S.stacks) for (const c of st.cards) if (c.k === 'fire') extinguish(c, st, '폭풍에');
   }
 }
+// 〔v0.5 확정: 시설 내구도·보수〕 폭풍 1분마다 시설 내구 감소. 오두막이 있으면 오두막만 닳음 (나머지는 오두막이 지켜 줌)
+function facWear() {
+  const hut = findKind('hut');
+  const list = hut ? [hut] : allCards().filter(c => FAC[c.k]);
+  const mul = S.storm === 'small' ? .5 : 1, br = [];
+  for (const c of list) {
+    const Fc = FAC[c.k]; c.fd = fdOf(c) - Fc.storm * mul / 60;
+    if (c.fd <= 1e-6) br.push(c);
+    else if (!c.fdw && c.fd <= Fc.max * .3) { c.fdw = 1; say(`⚠️ ${K[c.k].e} ${K[c.k].n}이(가) 곧 부서진다! (내구 ${Math.ceil(c.fd)}/${Fc.max}) 보수: ${fixList(c.k)}`, 'bad'); }
+  }
+  if (br.length) breakFac(br, '폭풍에');
+}
+function breakFac(list, why) { removeCards(list); SND.q('break'); say(`💥 ${why} ${list.map(c => K[c.k].e + ' ' + K[c.k].n).join('·')}이(가) 부서졌다.`, 'bad'); }
 function restRate() {
   if (findKind('hut')) return {r:12, nm:'오두막', hut:true};
   if (findKind('windbreak')) return {r:9, nm:'바람막이', wb:true};
@@ -400,6 +422,7 @@ function restRate() {
    열(오름): 배탈 중 0.25, 다친 지 6시간 넘은 부상(염증) 0.1, 맑은 낮에 수분 20 이하로 살피기 1번마다 +0.3 (열사병)
    열 내림(36.5 위, 열 원인 없을 때): 0.2, 쉬면서 수분 30 초과면 0.4. 물 마시기 −0.3 */
 const TEMP_N = 36.5;
+const REPAIR_COOL = .3; // 〔v0.5 확정: 시설 내구도·보수〕 폭풍 속 보수 중 추가 식힘 ℃/시간
 const TBANDS = [[33, '심한 저체온', 'cold'], [35, '저체온', 'cold'], [36, '오한', 'cool'], [37.5, '정상', 'ok'], [38.5, '미열', 'warm'], [40, '고열', 'hot'], [99, '위험한 고열', 'hot']];
 function tband(t = S.temp) { // 오한 35.0~36.0, 미열 37.5 초과~38.5 …
   for (let i = 0; i < TBANDS.length; i++) { const [lim, nm, cl] = TBANDS[i]; if (i < 3 ? t < lim : t <= lim) return {i, nm, cl}; }
@@ -410,6 +433,7 @@ function tempRate(rest) {
   let cool = 0, warm = 0, fever = 0;
   if (S.storm) cool = hut ? 0 : wb ? .25 : .5;
   else { if (S.rain && !hut && !wb) cool += .15; if (n && !hut) cool += .1; }
+  if (S.repairing && S.storm) cool += REPAIR_COOL; // 〔v0.5 확정: 시설 내구도·보수〕 폭풍 속 보수 작업 중 추가 식힘
   if (findKind('fire')) warm += .3;
   if (rest && hut) warm += .4;
   if (!S.rain && !S.storm && !n) warm += .1;
@@ -529,13 +553,19 @@ function rainHour(m) {
   if (m % 120 === 0) { const r = S.places.ledge.pools.rainw; r[0] = Math.min(r[1], r[0] + 1); }
 }
 function nightBeast() {
-  if (findKind('fence') || findKind('hut')) return; // 울타리(오두막 포함)는 밤짐승 차단
+  const wall = findKind('hut') || findKind('fence'); // 울타리(오두막 포함)는 밤짐승 차단. 〔v0.5 확정: 시설 내구도·보수〕 대신 들이받히면 내구 −4
   const d = day();
   let p = Math.min(.40, .10 + .02 * (d - 1));
   const foods = allCards().filter(c => K[c.k].cat === 'food');
   if (foods.length) p += .15;
   if (findKind('fire')) p *= .5;
   if (rnd() < p) {
+    if (wall) {
+      wall.fd = fdOf(wall) - 4; SND.q('boar');
+      if (wall.fd <= 1e-6) breakFac([wall], '멧돼지에');
+      else say(`🐗 멧돼지가 ${K[wall.k].n}을(를) 들이받고 돌아갔다. 내구 −4 (${Math.ceil(wall.fd)}/${FAC[wall.k].max})`, 'bad');
+      return;
+    }
     const n = Math.min(foods.length, rnd() < .5 ? 1 : 2);
     const stolen = [];
     for (let i = 0; i < n; i++) { const idx = Math.floor(rnd() * foods.length); stolen.push(foods.splice(idx, 1)[0]); }
@@ -678,7 +708,7 @@ function openRest() {
   const m = mod(); const canSleep = m >= 1080 || m < 360;
   const toMorning = ((360 - m) + 1440) % 1440 || 1440;
   let mult = [];
-  if (S.storm) mult.push(rr.hut ? '폭풍: 오두막 안 +8/시간' : `폭풍: 회복 없음, 체력 −${rr.wb ? 4 : 8}/시간`);
+  if (S.storm) mult.push(rr.hut ? '폭풍: 오두막 안 +8/시간' : `폭풍: 회복 없음, 체력 −${rr.wb ? 3 : 8}/시간`);
   else { if (n) mult.push('밤 ×1.25'); if (S.rain && !rr.hut) mult.push(rr.wb ? '비 ×0.75' : '비 ×0.5'); }
   if (S.hunger <= 20 || S.thirst <= 20) mult.push('포만감/수분 20↓ ×0.5');
   if (tband().i <= 1) mult.push('저체온 ×0.5');
@@ -720,6 +750,24 @@ function partialRecipe(cs) { const c = counts(cs); return RECIPES.some(r => subC
 // 고정 카드(장소·불·시설) 위에 카드를 올렸을 때
 function fixedInteraction(a, b, bst) {
   const ak = a.k, bk = b.k;
+  if (FAC[bk]) { // 〔v0.5 확정: 시설 내구도·보수〕 재료를 올려 보수
+    const Fb = FAC[bk], mat = ak === 'vine' ? 'rope' : ak, add = Fb.fix[mat];
+    if (add && fdOf(b) < Fb.max - 1e-6) {
+      const storm = !!S.storm, t = storm ? 40 : 20;
+      return {e:1, run:() => {
+        removeCards([a]); S.repairing = 1;
+        try {
+          act(t, 1, () => {
+            if (!allCards().includes(b)) return say(`💥 보수하는 사이 ${K[bk].n}이(가) 부서졌다…`, 'bad');
+            b.fd = Math.min(Fb.max, fdOf(b) + add); if (b.fd > Fb.max * .3) delete b.fdw;
+            SND.q(mat === 'leaf' ? 'explore_jungle' : 'chop');
+            say(`🔨 ${K[bk].e} ${K[bk].n} 보수 +${add} → 내구 ${Math.ceil(b.fd - 1e-6)}/${Fb.max} (${t}분)${storm ? ' · 폭풍 속 작업이라 몸이 더 식었다' : ''}`, 'good');
+          });
+        } finally { S.repairing = 0; }
+      }};
+    }
+    if (add && !RECIPES.some(r => r.up === bk && r.inp[mat])) return {msg:`${K[bk].e} ${K[bk].n}은(는) 아직 튼튼해요 (내구 ${Fb.max}/${Fb.max}).`};
+  }
   if (bk === 'fire') {
     if (K[ak].cook) {
       if (b.cook) return {msg:'🔥 이미 굽는 중이에요 (모닥불 조리 1개).'};
@@ -1009,6 +1057,7 @@ function cardInner(c, st, i) {
   else if (c.k === 'hut') ft = '폭풍 차단<br>쉬기 +12';
   else if (c.k === 'fence') ft = '밤짐승<br>차단';
   else if (c.k === 'bigclam') ft = '조개 그릇<br>재료(다음)';
+  if (FAC[c.k]) { const Fc = FAC[c.k], v = fdOf(c); ft = (c.k === 'hut' ? '쉬기 +12' : c.k === 'fence' ? '밤짐승 차단' : ft) + `<br>내구 ${Math.ceil(v - 1e-6)}/${Fc.max}`; bar = v / Fc.max * 100; if (v <= Fc.max * .3) cls += ' frail'; }
   else if (c.k === 'compost') { const it = c.items || []; ft = it.length ? `썩는 중 ${it.length}/${COMPOST_MAX}<br>${Math.max(0, Math.ceil((Math.min(...it.map(x => x.until)) - S.t) / 60))}시간 뒤` : '상한 음식<br>넣기'; if (it.length) bar = (1 - (Math.min(...it.map(x => x.until)) - S.t) / COMPOST_MIN) * 100; }
   else if (c.k === 'humus') ft = '농사용<br>(다음 빌드)';
   else if (c.k === 'rotten') ft = '먹으면 배탈<br>🌊에 버리기';
@@ -1177,15 +1226,15 @@ function onTap(card) {
   if (d.eat || d.closed || d.noRaw) return eat(card);
   // 정보 표시만 (행동 없음)
   const tips = {
-    hut:'폭풍·밤 추위를 막아 줘요. 안에서 쉬면 체온 +0.4℃/시간. 쉬기는 🏕️ 기지를 탭', fence:'밤짐승을 막아 줘요', bigclam:'조개 그릇 재료 (다음 빌드)',
+    hut:'폭풍·밤 추위를 막아 줘요. 안에서 쉬면 체온 +0.4℃/시간. 폭풍에 내구가 천천히 닳아요. 쉬기는 🏕️ 기지를 탭', fence:'밤짐승을 막아 줘요 (들이받히면 내구 −4)', bigclam:'조개 그릇 재료 (다음 빌드)',
     compost:'🤢 상한 음식·🦴 생선뼈·🌱 해초를 올리면 24시간 뒤 🟤 퇴비 (최대 3개 동시)',
     humus:'🌱 농사(화분)에 주면 자라는 속도가 빨라져요 — 농사는 다음 빌드에서 열려요',
     fire:'켜져 있으면 몸이 데워져요 (+0.3℃/시간). 재료를 올리면 굽기, 나뭇가지·통나무는 연료, 꺼진 횃불은 다시 붙이기', firex:'✨ 불씨를 올리면 다시 피울 수 있어요',
-    bed:'쉬기는 🏕️ 기지를 탭', windbreak:'비를 막아 몸이 식지 않아요 (폭풍 피해 절반). 쉬기는 🏕️ 기지를 탭', ember:'나뭇가지에 올리면 모닥불, 30분 안에 쓰세요',
+    bed:'쉬기는 🏕️ 기지를 탭', windbreak:'비를 막아 몸이 식지 않아요 (폭풍 피해 −3/시간으로 줄임). 폭풍에 내구가 닳으니 보수하세요. 쉬기는 🏕️ 기지를 탭', ember:'나뭇가지에 올리면 모닥불, 30분 안에 쓰세요',
     torchx:'🔥 모닥불에 올리면 다시 붙어요', sharp:'코코넛·정글에 올리거나 다른 재료와 조합', knife:'생선·게 손질, 코코넛, 정글(통나무)',
     spear:'🌊 얕은 바다에 올려 낚시', rod:'🌊 얕은 바다에 올려 낚시', drill:'섬유와 합치면 불씨', torch:'밤에 해변 말고도 살필 수 있어요',
   };
-  toast(`${d.e} ${d.n}${card.dur ? ` · 내구 ${card.dur}/${maxDur(card)}` : ''}${tips[card.k] ? ' — ' + tips[card.k] : ''}`);
+  toast(`${d.e} ${d.n}${card.dur ? ` · 내구 ${card.dur}/${maxDur(card)}` : ''}${FAC[card.k] ? ` · 내구 ${Math.ceil(fdOf(card) - 1e-6)}/${FAC[card.k].max} (보수: ${fixList(card.k)})` : ''}${tips[card.k] ? ' — ' + tips[card.k] : ''}`);
 }
 
 /* ---------- 시트 (도감·도움말·사망·특성) ---------- */
@@ -1224,6 +1273,7 @@ function showHelp() {
       <li>같은 카드 <b>한 장 위에 한 장</b> = 조합 (예: 🪨+🪨 = 날 선 돌). 같은 카드 <b>더미 위</b>에 놓으면 그냥 쌓기.</li>
       <li>재료가 셋 이상인 조합은 <b>하나씩 차례로</b> 쌓아요. 맞지 않는 카드는 튕겨 나와요.</li>
       <li>🏕️ <b>시설</b>(침상·빗물 받이·울타리·퇴비 더미)은 재료를 한 더미로 모아 <b>기지 카드 위에</b> 올려야 지어져요. 바람막이·오두막은 침상·울타리 위에 재료를 올려 업그레이드.</li>
+      <li>🔨 <b>시설 내구도</b>: 침상·바람막이·빗물 받이·울타리·오두막은 폭풍에 내구가 줄고 (오두막이 제일 느림, 침상이 제일 빠름) 0이 되면 부서져요. 맞는 재료를 시설 위에 올리면 보수 (20분, 폭풍 중 40분 + 몸이 더 식음): 🍃 잎·🥢 나뭇가지 → 침상·바람막이·빗물 받이, 🧶 노끈 → 바람막이 크게, 🪵 통나무 → 울타리·오두막.</li>
       <li>🌊 <b>버리기</b>: 필요 없는 카드(도구·장소·시설 제외)를 얕은 바다에 끌어다 놓으면 사라져요 (시간 0분).</li>
       <li>🤢 상한 음식은 탭하면 먹을지 한 번 물어봐요. 🪱 퇴비 더미(나뭇가지 2 + 잎 2)에 넣으면 24시간 뒤 🟤 퇴비 (농사용, 다음 빌드).</li>
       <li>더미는 맨 위 한 장만 집혀요. <b>×N 표시</b>를 잡고 끌면 더미 통째로.</li>
@@ -1237,7 +1287,7 @@ function showHelp() {
       <li>밤(18:00~06:00)에는 횃불 없이 해변·갯벌(썰물 때)만 살필 수 있어요. 밤에는 멧돼지가 올 수 있어요 (음식이 있으면 더 자주, 모닥불이 있으면 덜, 🚧 울타리·🛖 오두막이 있으면 안 와요).</li>
       <li>날생선·고인 빗물은 배탈 위험 (탭하면 바로 먹어요). 굽거나 빗물 받이 물을 마셔요.</li>
       <li>🏝️ <b>갯벌</b>은 썰물(하루 2번, 2시간) 때만 열려요. 썰물 시각은 매일 1시간씩 늦어져요.</li>
-      <li>⛈️ <b>7일마다 큰 폭풍</b>(12:00~다음 날 06:00), 비가 사흘 이어지면 작은 폭풍. 🛖 오두막(울타리 + 통나무 2 + 잎 3)이 없으면 체력 −8/시간(⛺ 바람막이 −4), 몸이 빠르게 식고 침상·불이 망가져요. 오두막 없이는 쉬어도 기운이 회복되지 않아요.</li>
+      <li>⛈️ <b>7일마다 큰 폭풍</b>(12:00~다음 날 06:00), 비가 사흘 이어지면 작은 폭풍. 🛖 오두막(울타리 + 통나무 2 + 잎 3)이 없으면 체력 −8/시간(⛺ 바람막이 −3), 몸이 빠르게 식고 불이 꺼지고 시설 내구가 닳아요. 오두막 없이는 쉬어도 기운이 회복되지 않아요.</li>
       <li><b>정렬</b> 버튼: 카드를 종류별로 모아 정리.</li>
       <li>죽으면 생존 일수·새 조합·새 장소로 <b>각인 점수</b>를 얻고, 알아낸 조합은 남아요.</li>
     </ul>
@@ -1634,14 +1684,15 @@ function boot() {
   if (run && run.v === VERSION) {
     S = run;
     if (!S.st100) { S.hunger = 100 - S.hunger; S.thirst = 100 - S.thirst; S.st100 = 1; saveRun(); } // 〔v0.5〕 상태 100 기준으로 옮기기
-    if (typeof S.temp !== 'number' || S.temp > 45) { S.temp = 36.5; saveRun(); } // 〔v0.5 확정: 체온〕 예전 저장은 36.5℃로 시작
+    if (typeof S.temp !== 'number' || S.temp > 45) { S.temp = 36.5; saveRun(); }
+    for (const c of allCards()) if (FAC[c.k] && c.fd === undefined) c.fd = FAC[c.k].max; // 〔v0.5 확정: 시설 내구도·보수〕 예전 시설은 내구 가득 // 〔v0.5 확정: 체온〕 예전 저장은 36.5℃로 시작
     if (S.dead) { render(); showDeath(); return; }
     sortBoardIfOff(); render();
   } else { newGame(meta.unlocked.stone && meta.lastTraits ? meta.lastTraits.filter(id => meta.unlocked[id]) : [], false); render(); }
   if (!meta.seenHelp) showHelp();
 }
 function sortBoardIfOff() { if (S.stacks.some(st => st.x + D.cw > D.W + 2)) sortBoard(true); }
-window.__game = {snd:SND, tide:{open:() => flatOpen(), windows:tideWindows}, get S() { return S; }, get meta() { return meta; }, sortBoard, render, D, K, advance:(m) => { advance(m); after(); }};
+window.__game = {fi:(a, b) => fixedInteraction(a, b, stackOf(b)), snd:SND, tide:{open:() => flatOpen(), windows:tideWindows}, get S() { return S; }, get meta() { return meta; }, sortBoard, render, D, K, advance:(m) => { advance(m); after(); }};
 boot();
 </script>
 </body>
