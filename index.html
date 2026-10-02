@@ -26,7 +26,12 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
 #sheet .seg>span{width:58px;flex:none;font-weight:700;font-size:14px}
 #sheet .seg button{flex:1;min-height:42px;padding:0 4px}
 #sheet .seg button.on{background:#ffd36b;outline:2px solid #d9a400}
-#bars{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin-top:5px}
+#bars{display:grid;grid-template-columns:1fr 1fr auto;gap:4px 8px;margin-top:5px}
+#thermo{grid-column:3;grid-row:1/3;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:9px;padding:1px 6px;min-width:62px;background:rgba(255,255,255,.12);line-height:1.15}
+#thermo .tv{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+#thermo .tl{font-size:10.5px;font-weight:700;white-space:nowrap}
+#thermo.th-cool{background:#3f6f9e} #thermo.th-cold{background:#2a62c9;box-shadow:0 0 0 2px #8fc3ff inset}
+#thermo.th-warm{background:#c9772a} #thermo.th-hot{background:#c7392b;box-shadow:0 0 0 2px #ffb199 inset}
 .bar2{display:flex;align-items:center;gap:5px;font-size:11.5px}
 .bar2 .lb{width:44px;flex:none;opacity:.9}
 .bar2 .tr{flex:1;height:10px;background:rgba(255,255,255,.15);border-radius:6px;overflow:hidden}
@@ -229,9 +234,9 @@ const BOOK = [
   ['cook_eggc','🍳','구운 새알','🥚 새알 → 🔥 모닥불 (20분)','campfire'],
   ['bed','🛏️','침상','🍃 잎 ×2 더미 → 🏕️ 기지에 올리기 · 쉬기 기운 +8/시간'],
   ['catcher','🪣','빗물 받이','🍃 잎 ×2 + 🥢 나뭇가지 더미 → 🏕️ 기지에 올리기 · 비 2시간마다 물 1잔 (최대 3)'],
-  ['windbreak','⛺','바람막이','🛏️ 침상 위에 🧶 노끈 + 🥢 나뭇가지 ×2 (또는 그 더미를 🏕️ 기지에) · 쉬기 +9, 비 피해 절반','bed'],
+  ['windbreak','⛺','바람막이','🛏️ 침상 위에 🧶 노끈 + 🥢 나뭇가지 ×2 (또는 그 더미를 🏕️ 기지에) · 쉬기 +9, 비 피해 절반, 비에 몸이 안 식음, 폭풍 피해 절반','bed'],
   ['fence','🚧','울타리','🪵 통나무 ×3 더미 → 🏕️ 기지에 올리기 · 밤짐승 차단','chop'],
-  ['hut','🛖','오두막','🚧 울타리 위에 🪵 통나무 ×2 + 🍃 잎 ×3 (또는 그 더미를 🏕️ 기지에) · 폭풍 차단, 쉬기 +12','fence'],
+  ['hut','🛖','오두막','🚧 울타리 위에 🪵 통나무 ×2 + 🍃 잎 ×3 (또는 그 더미를 🏕️ 기지에) · 폭풍 차단, 쉬기 +12, 밤 추위 막음, 안에서 쉬면 몸이 데워짐','fence'],
   ['compost','🪱','퇴비 더미','🥢 나뭇가지 ×2 + 🍃 잎 ×2 더미 → 🏕️ 기지에 올리기 · 상한 음식 처리'],
   ['humus','🟤','퇴비','🤢 상한 음식 / 🦴 생선뼈 / 🌱 해초 → 🪱 퇴비 더미 · 24시간 뒤 (최대 3개 동시) · 농사용(다음 빌드)','compost'],
   ['discard','🌊','버리기','필요 없는 카드 → 🌊 얕은 바다 (도구·장소·시설 제외) · 상한 음식·생선뼈는 가끔 게를 부름'],
@@ -246,7 +251,7 @@ const TRAITS = [
   {id:'seaman', n:'바다 사람', cost:4, d:'낚시 기운 소모 −30%', cond:'첫 생선 낚기'},
   {id:'nighteye', n:'밤눈', cost:4, d:'밤 탐색 위험(부상·밤짐승) 절반', cond:'첫 밤 살피기'},
   {id:'map', n:'기억 속 지도', cost:5, d:'해변·얕은 바다·정글·바위턱 탐사도 30%로 시작', cond:'첫 장소 탐사도 100%'},
-  {id:'stormsense', n:'폭풍 감각', cost:4, d:'큰 폭풍 예고가 하루 전, 폭풍 중 체력 피해 절반', cond:'첫 폭풍 생존'},
+  {id:'stormsense', n:'폭풍 감각', cost:4, d:'큰 폭풍 예고가 하루 전, 폭풍 중 체력 피해 절반 (체온은 그대로)', cond:'첫 폭풍 생존'},
 ];
 
 /* ---------- 장소 테이블 (13장) ---------- */
@@ -306,7 +311,7 @@ function mk(k) {
 function maxDur(c) { return K[c.k].dur + (c.k === 'drill' && hasTrait('firehand') ? 3 : 0); }
 
 function newGame(traits, naked) {
-  S = {v:VERSION, st100:1, t:420, hp:100, energy:100, hunger:80, thirst:80, sick:0, injured:0, rain:false, rainStreak:0, storm:0, stormStart:0, stormEnd:0,
+  S = {v:VERSION, st100:1, t:420, hp:100, energy:100, hunger:80, thirst:80, temp:36.5, sick:0, injured:0, rain:false, rainStreak:0, storm:0, stormStart:0, stormEnd:0,
        stacks:[], places:initPools(), nid:1, dead:false, scored:false, lastCause:'',
        life:{traits:traits || [], naked:!!naked, surv:0, storms:0, newRecipes:[], newPlaces:[]}, log:[], flags:{}};
   for (const k of PLACE_ORDER) addStack([mk(k)], 0, 0);
@@ -337,7 +342,7 @@ function toast(m, type = '') {
 const clockStr = (t = S.t) => `${pad(Math.floor(mod(t) / 60))}:${pad(mod(t) % 60)}`;
 
 /* ---------- 시간 진행 (행동할 때만) ---------- */
-function dmg(v, cause) { S.hp -= v; S.lastCause = cause; if (S.hp <= 0) { S.hp = 0; S.dead = true; } }
+function dmg(v, cause) { if (S.dead) return; S.hp -= v; S.lastCause = cause; if (S.hp <= 0) { S.hp = 0; S.dead = true; } }
 /* ---------- 조수 (14.2): 하루 2번 2시간, 매일 1시간씩 늦어지고 7일 주기 ---------- */
 function tideWindows(d) { const c = (d - 1) % 7, b = (d - 1) * 1440; return [[b + (9 + c) * 60, b + (11 + c) * 60], [b + (21 + c) * 60, b + (23 + c) * 60]]; }
 function lowTideEnd(t = S.t) { const d = day(t); for (const dd of [d - 1, d]) { if (dd < 1) continue; for (const [a, b] of tideWindows(dd)) if (t >= a && t < b) return b; } return 0; }
@@ -362,7 +367,7 @@ function startStorm(type, end) {
     if (c.k === 'catcher') c.water = 0;
     if (c.k === 'fire' && !hasHut()) extinguish(c, st, '폭풍에');
   }
-  say(`⛈️ ${type === 'big' ? '큰 폭풍' : '폭풍'}이 몰아친다! (${whenStr(end)}까지)${hasHut() ? ' 오두막 안은 안전하다.' : ' 오두막이 없으면 체력이 깎이고, 3시간 뒤 침상·바람막이가 부서진다.'}`, 'bad');
+  say(`⛈️ ${type === 'big' ? '큰 폭풍' : '폭풍'}이 몰아친다! (${whenStr(end)}까지)${hasHut() ? ' 오두막 안은 안전하다.' : ' 오두막이 없으면 체력이 깎이고 몸이 식는다. 3시간 뒤 침상이 부서진다.'}`, 'bad');
 }
 function endStorm() {
   S.storm = 0; S.life.storms = (S.life.storms || 0) + 1;
@@ -374,9 +379,10 @@ function stormMinute() {
   if (S.storm && S.t >= S.stormEnd) endStorm();
   if (d % 7 === 0 && m === 720) startStorm('big', S.t + 1080);
   if (S.storm && !hasHut()) {
-    dmg(5 / 60 * (hasTrait('stormsense') ? .5 : 1), '폭풍');
+    // 〔v0.5 확정: 체온·폭풍 강화〕 오두막 없음 체력 −8/시간, 바람막이가 있으면 −4/시간 (폭풍 감각 절반). 바람막이는 부서지지 않고 침상만 부서짐
+    dmg((findKind('windbreak') ? 4 : 8) / 60 * (hasTrait('stormsense') ? .5 : 1), '폭풍');
     if (S.t - S.stormStart === 180) {
-      const wreck = allCards().filter(c => c.k === 'bed' || c.k === 'windbreak');
+      const wreck = allCards().filter(c => c.k === 'bed');
       if (wreck.length) { removeCards(wreck); say(`🌪️ 폭풍에 ${wreck.map(c => K[c.k].n).join('·')}이(가) 부서졌다.`, 'bad'); SND.q('break'); }
     }
     if (m % 60 === 0) for (const st of S.stacks) for (const c of st.cards) if (c.k === 'fire') extinguish(c, st, '폭풍에');
@@ -388,6 +394,52 @@ function restRate() {
   if (findKind('bed')) return {r:8, nm:'침상'};
   return {r:6, nm:'맨바닥'};
 }
+/* ---------- 〔v0.5 확정: 체온·폭풍 강화〕 체온 (℃, 정상 36.5, 임시값) ----------
+   식힘(/시간): 폭풍 중이면 폭풍 값만 (오두막 0 / 바람막이 0.25 / 없음 0.5), 아니면 비(바람막이·오두막 없을 때) 0.15 + 밤 야외(오두막 없을 때) 0.1
+   데움(36.5 아래일 때만, 36.5를 넘기지 않음): 켜진 모닥불 0.3 + 오두막에서 쉬기 0.4 + 맑은 낮 0.1 + 식힘 없을 때 몸 스스로 0.1 + 오한(36.0 아래) 몸 떨림 0.15
+   열(오름): 배탈 중 0.25, 다친 지 6시간 넘은 부상(염증) 0.1, 맑은 낮에 수분 20 이하로 살피기 1번마다 +0.3 (열사병)
+   열 내림(36.5 위, 열 원인 없을 때): 0.2, 쉬면서 수분 30 초과면 0.4. 물 마시기 −0.3 */
+const TEMP_N = 36.5;
+const TBANDS = [[33, '심한 저체온', 'cold'], [35, '저체온', 'cold'], [36, '오한', 'cool'], [37.5, '정상', 'ok'], [38.5, '미열', 'warm'], [40, '고열', 'hot'], [99, '위험한 고열', 'hot']];
+function tband(t = S.temp) { // 오한 35.0~36.0, 미열 37.5 초과~38.5 …
+  for (let i = 0; i < TBANDS.length; i++) { const [lim, nm, cl] = TBANDS[i]; if (i < 3 ? t < lim : t <= lim) return {i, nm, cl}; }
+  return {i:6, nm:'위험한 고열', cl:'hot'};
+}
+function tempRate(rest) {
+  const hut = hasHut(), wb = !!findKind('windbreak'), n = isNight();
+  let cool = 0, warm = 0, fever = 0;
+  if (S.storm) cool = hut ? 0 : wb ? .25 : .5;
+  else { if (S.rain && !hut && !wb) cool += .15; if (n && !hut) cool += .1; }
+  if (findKind('fire')) warm += .3;
+  if (rest && hut) warm += .4;
+  if (!S.rain && !S.storm && !n) warm += .1;
+  if (!cool) warm += .1;
+  if (S.temp < 36) warm += .15;
+  if (S.sick > 0) fever += .25;
+  if (S.injured > 0 && S.injured <= 1080) fever += .1;
+  const down = fever ? 0 : (rest && S.thirst > 30 ? .4 : .2);
+  const net = S.temp < TEMP_N ? warm + fever - cool : S.temp > TEMP_N ? fever - cool - down : fever - cool;
+  return {cool, warm, fever, down, net};
+}
+function stepTemp(rest) {
+  const t0 = S.temp, r = tempRate(rest), b0 = tband(t0);
+  let t = t0 + r.net / 60;
+  if (!r.fever && t0 < TEMP_N && t > TEMP_N) t = TEMP_N; // 데움은 36.5를 넘기지 않음
+  if (!r.cool && t0 > TEMP_N && t < TEMP_N) t = TEMP_N;  // 열 내림도 36.5에서 멈춤
+  S.temp = clamp(t, 28, 43);
+  tempMsg(b0);
+}
+function tempMsg(b0) {
+  const b = tband();
+  if (b.i === b0.i) return;
+  const worse = Math.abs(b.i - 3) > Math.abs(b0.i - 3);
+  const msg = {0:'🥶 심한 저체온! 체력 −8/시간 — 당장 몸을 녹이자', 1:'🥶 저체온! 체력 −3/시간, 기운 회복 절반 — 🔥 모닥불이나 🛖 오두막으로', 2:'🥶 오한이 든다 (기운 소모 +25%)',
+               4:'🤒 미열이 난다 (수분 −30% 더 빨리)', 5:'🤒 고열! 체력 −3/시간, 수분 −60% 더 빨리 — 쉬면서 물을 마시자', 6:'🔥 위험한 고열! 체력 −8/시간'};
+  if (worse && msg[b.i]) say(`${msg[b.i]} (체온 ${S.temp.toFixed(1)}℃)`, 'bad');
+  else if (!worse && b.i === 3) say(`🌡️ 체온이 돌아왔다 (${S.temp.toFixed(1)}℃)`, 'good');
+}
+function heatUp(v, why) { const b0 = tband(); S.temp = clamp(S.temp + v, 28, 43); say(why, 'bad'); tempMsg(b0); }
+function coolDrink() { if (S.temp > TEMP_N) { const b0 = tband(); S.temp = Math.max(TEMP_N, S.temp - .3); tempMsg(b0); return ' 열 −0.3℃'; } return ''; }
 function advance(min, mode = 'awake') {
   const rest = mode === 'rest';
   for (let i = 0; i < min && !S.dead; i++) {
@@ -397,6 +449,8 @@ function advance(min, mode = 'awake') {
     // 〔v0.5 확정: 상태 100 기준〕 hunger = 포만감, thirst = 수분 (100 = 가득, 시간이 지나면 줄어듦, 0이면 체력 감소)
     S.hunger = clamp(S.hunger - (sleepy ? 2 : 4) / 60);
     let th = (sleepy ? 2 : 5) / 60;
+    const tb = tband().i; // 미열 수분 감소 +30%, 고열 이상 +60%
+    if (tb === 4) th *= 1.3; else if (tb >= 5) th *= 1.6;
     if (S.sick > 0) { th *= 2; S.sick--; if (!S.sick) say('배탈이 가라앉았다.'); }
     S.thirst = clamp(S.thirst - th);
     if (S.hunger <= 0) dmg(4 / 60, '굶주림');
@@ -410,10 +464,13 @@ function advance(min, mode = 'awake') {
         if (S.rain && !rr.hut) r *= rr.wb ? .75 : .5;
       }
       if (S.hunger <= 20 || S.thirst <= 20) r *= .5;
+      if (tband().i <= 1) r *= .5; // 저체온: 기운 회복 절반
       S.energy = clamp(S.energy + r / 60);
       if (S.hunger > 30 && S.thirst > 30 && (!S.storm || rr.hut)) S.hp = clamp(S.hp + (rr.hut ? 4 : 2) / 60);
     }
     if (S.energy <= 0) dmg(3 / 60, '탈진'); // 〔v0.5 확정〕 기운 0 → 체력 −3/시간
+    stepTemp(rest);
+    { const bi = tband().i; if (bi <= 1) dmg((bi === 0 ? 8 : 3) / 60, '저체온'); else if (bi >= 5) dmg((bi === 6 ? 8 : 3) / 60, '고열'); }
     tickCards();
     stormMinute();
     if (isTideStart(S.t)) { const p = S.places.flat.pools.all; p[0] = p[1]; if (!S.storm) say(`🏝️ 썰물! 갯벌이 열렸다 (${clockStr(S.t + 120)}까지)`); }
@@ -495,7 +552,7 @@ function canAct(e) {
   return true;
 }
 function act(min, e, fn, mode) {
-  const cost = e * (isWet() ? 1.5 : 1);
+  const cost = e * (isWet() ? 1.5 : 1) * (S.temp < 36 && S.temp >= 35 ? 1.25 : 1); // 오한: 기운 소모 +25%
   S.energy = clamp(S.energy - cost);
   advance(min, mode);
   if (!S.dead && fn) fn();
@@ -522,7 +579,7 @@ function appear(tid) {
 function getSick() {
   S.thirst = clamp(S.thirst - 20); S.energy = clamp(S.energy - 15); S.sick = 360;
   SND.q('sick');
-  say('🤢 배탈이 났다! 수분 −20, 기운 −15, 6시간 동안 수분이 2배로 빨리 줄어듦', 'bad');
+  say('🤢 배탈이 났다! 수분 −20, 기운 −15, 6시간 동안 수분이 2배로 빨리 줄고 열이 오름', 'bad');
   appear('stomach');
 }
 function wear(c) {
@@ -563,6 +620,7 @@ function explore(card) {
       if (before < 100 && P.exp >= 100) { say(`🗺️ ${K[k].n} 탐사 100%!`, 'good'); appear('map'); }
     }
     if (S.storm) { dmg(10, '폭풍'); SND.q('hurt'); say('⛈️ 폭풍 속에서는 아무것도 찾지 못했다. 체력 −10', 'bad'); return; }
+    if (!S.rain && !night && S.thirst <= 20) heatUp(.3, '🥵 목이 탄 채 뙤약볕 아래를 돌아다녔다. 체온 +0.3℃');
     // 결과 굴리기
     let roll = rnd() * 100, got = null;
     for (const [rk, pr, pool] of dropTable(k)) {
@@ -602,14 +660,14 @@ function eat(card) {
     SND.q(d.cat === 'water' ? 'drink' : 'eat');
     if (d.eat.h) S.hunger = clamp(S.hunger + d.eat.h);
     if (d.eat.t) S.thirst = clamp(S.thirst + d.eat.t);
-    say(`${d.e} ${d.n}을(를) ${verb}.${d.eat.h ? ' 포만감 +' + d.eat.h : ''}${d.eat.t ? ' 수분 +' + d.eat.t : ''}`);
+    say(`${d.e} ${d.n}을(를) ${verb}.${d.eat.h ? ' 포만감 +' + d.eat.h : ''}${d.eat.t ? ' 수분 +' + d.eat.t : ''}${d.cat === 'water' ? coolDrink() : ''}`);
     if (d.eat.sick) { const p = d.eat.sick * (hasTrait('stomach') ? .5 : 1); if (rnd() < p) getSick(); }
   });
 }
 function drinkCatcher(card) {
   if (!card.water) return toast('🪣 빗물 받이가 비어 있어요. 비가 오면 2시간마다 1잔씩 찹니다.');
   card.water--;
-  act(5, 0, () => { SND.q('drink'); S.thirst = clamp(S.thirst + 25); say('🪣 빗물을 마셨다. 수분 +25'); });
+  act(5, 0, () => { SND.q('drink'); S.thirst = clamp(S.thirst + 25); say('🪣 빗물을 마셨다. 수분 +25' + coolDrink()); });
 }
 
 /* ---------- 쉬기 ---------- */
@@ -620,12 +678,16 @@ function openRest() {
   const m = mod(); const canSleep = m >= 1080 || m < 360;
   const toMorning = ((360 - m) + 1440) % 1440 || 1440;
   let mult = [];
-  if (S.storm) mult.push(rr.hut ? '폭풍: 오두막 안 +8/시간' : '폭풍: 회복 없음, 체력 −5/시간');
+  if (S.storm) mult.push(rr.hut ? '폭풍: 오두막 안 +8/시간' : `폭풍: 회복 없음, 체력 −${rr.wb ? 4 : 8}/시간`);
   else { if (n) mult.push('밤 ×1.25'); if (S.rain && !rr.hut) mult.push(rr.wb ? '비 ×0.75' : '비 ×0.5'); }
   if (S.hunger <= 20 || S.thirst <= 20) mult.push('포만감/수분 20↓ ×0.5');
+  if (tband().i <= 1) mult.push('저체온 ×0.5');
+  const tr = tempRate(true), tb = tband();
   sheet(`<h2>🏕️ 기지에서 쉬기</h2>
     <p>자리: <b>${rr.nm}</b> (기운 +${rr.r}/시간${mult.length ? ', ' + mult.join(', ') : ''})<br>
-    <span class="muted">쉬는 동안 포만감 −2, 수분 −2 /시간. 포만감·수분 둘 다 30 초과면 체력 +2/시간.</span></p>
+    <span class="muted">쉬는 동안 포만감 −2, 수분 −2 /시간. 포만감·수분 둘 다 30 초과면 체력 +2/시간.</span><br>
+    🌡️ 체온 ${S.temp.toFixed(1)}℃ ${tb.nm} → 쉬는 동안 ${Math.abs(tr.net) < .005 ? '그대로' : (tr.net > 0 ? '+' : '−') + Math.abs(tr.net).toFixed(2) + '℃/시간'}${tr.net > 0 && S.temp < TEMP_N && !tr.fever ? ' (36.5까지)' : ''}<br>
+    <span class="muted">몸을 데우는 것: 🔥 모닥불, 🛖 오두막에서 쉬기, 맑은 낮. 식히는 것: 비, 밤 바깥, 폭풍. 열은 쉬면서 물을 마시면 내려요.</span></p>
     <div class="btns">
       <button class="pri" data-rest="60">1시간 쉬기</button>
       <button data-rest="180">3시간 쉬기</button>
@@ -1006,7 +1068,11 @@ function renderHud() {
   $('#bars').innerHTML = bars.map(([l, v, col]) => {
     const bad = v <= 20;
     return `<div class="bar2 ${bad ? 'bad' : ''}"><span class="lb">${l}</span><span class="tr"><i style="width:${v}%;background:${bad ? '#ff6b4f' : col}"></i></span><span class="v">${Math.round(v)}</span></div>`;
-  }).join('');
+  }).join('') + thermoHTML();
+}
+function thermoHTML() { // 〔v0.5 확정: 체온〕 온도계 칩 (추우면 파랑, 열나면 주황·빨강)
+  const b = tband();
+  return `<div id="thermo" class="th-${b.cl}" title="체온"><span class="tv">🌡️${S.temp.toFixed(1)}℃</span><span class="tl">${b.nm}</span></div>`;
 }
 
 /* ---------- 포인터 (드래그 / 탭) ---------- */
@@ -1111,11 +1177,11 @@ function onTap(card) {
   if (d.eat || d.closed || d.noRaw) return eat(card);
   // 정보 표시만 (행동 없음)
   const tips = {
-    hut:'폭풍을 막아 줘요. 쉬기는 🏕️ 기지를 탭', fence:'밤짐승을 막아 줘요', bigclam:'조개 그릇 재료 (다음 빌드)',
+    hut:'폭풍·밤 추위를 막아 줘요. 안에서 쉬면 체온 +0.4℃/시간. 쉬기는 🏕️ 기지를 탭', fence:'밤짐승을 막아 줘요', bigclam:'조개 그릇 재료 (다음 빌드)',
     compost:'🤢 상한 음식·🦴 생선뼈·🌱 해초를 올리면 24시간 뒤 🟤 퇴비 (최대 3개 동시)',
     humus:'🌱 농사(화분)에 주면 자라는 속도가 빨라져요 — 농사는 다음 빌드에서 열려요',
-    fire:'재료를 올리면 굽기, 나뭇가지·통나무는 연료, 꺼진 횃불은 다시 붙이기', firex:'✨ 불씨를 올리면 다시 피울 수 있어요',
-    bed:'쉬기는 🏕️ 기지를 탭', windbreak:'쉬기는 🏕️ 기지를 탭', ember:'나뭇가지에 올리면 모닥불, 30분 안에 쓰세요',
+    fire:'켜져 있으면 몸이 데워져요 (+0.3℃/시간). 재료를 올리면 굽기, 나뭇가지·통나무는 연료, 꺼진 횃불은 다시 붙이기', firex:'✨ 불씨를 올리면 다시 피울 수 있어요',
+    bed:'쉬기는 🏕️ 기지를 탭', windbreak:'비를 막아 몸이 식지 않아요 (폭풍 피해 절반). 쉬기는 🏕️ 기지를 탭', ember:'나뭇가지에 올리면 모닥불, 30분 안에 쓰세요',
     torchx:'🔥 모닥불에 올리면 다시 붙어요', sharp:'코코넛·정글에 올리거나 다른 재료와 조합', knife:'생선·게 손질, 코코넛, 정글(통나무)',
     spear:'🌊 얕은 바다에 올려 낚시', rod:'🌊 얕은 바다에 올려 낚시', drill:'섬유와 합치면 불씨', torch:'밤에 해변 말고도 살필 수 있어요',
   };
@@ -1166,10 +1232,12 @@ function showHelp() {
       <li>음식을 🔥 모닥불에 올리면 20분 뒤 익어요 (다른 행동이나 쉬기로 시간이 흘러야 함).</li>
       <li><b>시간은 행동할 때만 흘러요.</b> 생각하는 시간은 공짜.</li>
       <li>상태 4개(체력·포만감·수분·기운)는 <b>100이 가득</b>이에요. 포만감·수분은 시간이 지나면 줄고, 먹고 마시면 차요. <b>포만감·수분·기운이 0이 되면 체력이 깎여요.</b> 20 이하가 되면 막대가 빨개져요.</li>
+      <li>🌡️ <b>체온</b>은 정상 36.5℃. 비(바람막이·오두막 없을 때)·밤 바깥(오두막 없을 때)·폭풍에 몸이 식고, 🔥 모닥불·🛖 오두막에서 쉬기·맑은 낮에 데워져요. 36.0 아래 오한(기운 소모 +25%), 35.0 아래 저체온(체력 −3/시간, 기운 회복 절반), 33.0 아래 심한 저체온(체력 −8/시간).</li>
+      <li>🤒 <b>열</b>: 배탈, 오래 둔 부상, 목마른 채(수분 20 이하) 맑은 낮에 살피기를 하면 열이 올라요. 37.5 초과 미열(수분 더 빨리 줄어듦), 38.5 초과 고열(체력 −3/시간), 40 초과 위험(체력 −8/시간). 쉬면서 물을 마시면 내려가요.</li>
       <li>밤(18:00~06:00)에는 횃불 없이 해변·갯벌(썰물 때)만 살필 수 있어요. 밤에는 멧돼지가 올 수 있어요 (음식이 있으면 더 자주, 모닥불이 있으면 덜, 🚧 울타리·🛖 오두막이 있으면 안 와요).</li>
       <li>날생선·고인 빗물은 배탈 위험 (탭하면 바로 먹어요). 굽거나 빗물 받이 물을 마셔요.</li>
       <li>🏝️ <b>갯벌</b>은 썰물(하루 2번, 2시간) 때만 열려요. 썰물 시각은 매일 1시간씩 늦어져요.</li>
-      <li>⛈️ <b>7일마다 큰 폭풍</b>(12:00~다음 날 06:00), 비가 사흘 이어지면 작은 폭풍. 🛖 오두막(울타리 + 통나무 2 + 잎 3)이 없으면 체력이 깎이고 침상·불이 망가져요.</li>
+      <li>⛈️ <b>7일마다 큰 폭풍</b>(12:00~다음 날 06:00), 비가 사흘 이어지면 작은 폭풍. 🛖 오두막(울타리 + 통나무 2 + 잎 3)이 없으면 체력 −8/시간(⛺ 바람막이 −4), 몸이 빠르게 식고 침상·불이 망가져요. 오두막 없이는 쉬어도 기운이 회복되지 않아요.</li>
       <li><b>정렬</b> 버튼: 카드를 종류별로 모아 정리.</li>
       <li>죽으면 생존 일수·새 조합·새 장소로 <b>각인 점수</b>를 얻고, 알아낸 조합은 남아요.</li>
     </ul>
@@ -1497,7 +1565,7 @@ const SND = (() => {
     mix.thunder = mix.storm ? 1.6 : ((d % 7 === 6 && m >= 1020) || (d % 7 === 0 && m >= 360 && m < 720)) ? 1 : 0;
     mix.dead = S.dead ? 1 : 0;
     // 상태 위험 경고: 위험 구간에 새로 들어갈 때만
-    const dg = {hp:S.hp <= 20, hunger:S.hunger <= 20, thirst:S.thirst <= 20, energy:S.energy <= 20};
+    const dg = {hp:S.hp <= 20, hunger:S.hunger <= 20, thirst:S.thirst <= 20, energy:S.energy <= 20, cold:S.temp < 35, fever:S.temp > 38.5};
     if (prevDanger && !S.dead && Object.keys(dg).some(k => dg[k] && !prevDanger[k])) q('warn');
     prevDanger = dg;
     apply();
@@ -1566,6 +1634,7 @@ function boot() {
   if (run && run.v === VERSION) {
     S = run;
     if (!S.st100) { S.hunger = 100 - S.hunger; S.thirst = 100 - S.thirst; S.st100 = 1; saveRun(); } // 〔v0.5〕 상태 100 기준으로 옮기기
+    if (typeof S.temp !== 'number' || S.temp > 45) { S.temp = 36.5; saveRun(); } // 〔v0.5 확정: 체온〕 예전 저장은 36.5℃로 시작
     if (S.dead) { render(); showDeath(); return; }
     sortBoardIfOff(); render();
   } else { newGame(meta.unlocked.stone && meta.lastTraits ? meta.lastTraits.filter(id => meta.unlocked[id]) : [], false); render(); }
