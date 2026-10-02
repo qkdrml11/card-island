@@ -52,8 +52,13 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
 .card{position:absolute;left:0;top:0;width:var(--cw);height:var(--ch);touch-action:none;will-change:transform;
   transition:transform .18s ease-out}
 .card.dragging{transition:none;pointer-events:none;z-index:100000!important}
-.card.dragging .ci{box-shadow:0 10px 22px rgba(0,0,0,.35);transform:scale(1.05) rotate(-1.5deg)}
-.card.hl .ci{outline:3px solid #ffef5a;outline-offset:1px}
+.card.dragging .ci{box-shadow:0 16px 28px rgba(0,0,0,.45);transform:translateY(-10px) scale(1.16) rotate(-2deg);transition:transform .08s}
+.card.lift .ci{transform:scale(1.07);box-shadow:0 8px 16px rgba(0,0,0,.35)}
+.card.hl .ci{outline:4px solid #ffe24a;outline-offset:1px;box-shadow:0 0 0 7px rgba(255,226,74,.45),0 2px 4px rgba(0,0,0,.25);transform:scale(1.05)}
+.card.newc .ci{animation:newc .6s ease-out}
+@keyframes newc{0%{transform:scale(1.15);box-shadow:0 0 0 5px #8fe388}100%{transform:none}}
+.ci .jb{position:absolute;top:1px;left:2px;font-size:calc(var(--cw)*.2);line-height:1}
+.ci .ft b.act{font-weight:800;color:#3b2f8f;display:inline-block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
 .ci{position:relative;width:100%;height:100%;border-radius:10px;border:2px solid #7b6a49;background:#fff8e6;
   display:flex;flex-direction:column;align-items:center;overflow:hidden;box-shadow:0 2px 4px rgba(0,0,0,.25);
   animation:pop .22s ease-out;transition:transform .12s}
@@ -261,8 +266,8 @@ const BOOK = [
   ['rope','🧶','노끈','🌾 섬유 + 🌾 섬유 (덩굴 ➰ 1개는 노끈 대신 쓸 수 있음)'],
   ['drill','🌀','손드릴','🥢 나뭇가지 + 🥢 나뭇가지'],
   ['ember','✨','불씨','🌀 손드릴(도구) + 🌾 섬유 · 성공 70% (비 40%) · 30분 안에 써야 함','drill'],
-  ['campfire','🔥','모닥불','✨ 불씨 + 🥢 나뭇가지 · 연료 3시간','ember'],
-  ['fuel','🔥','모닥불 연료','🥢 나뭇가지(+2시간) / 🪵 통나무(+6시간) → 🔥 모닥불','campfire'],
+  ['campfire','🔥','모닥불','✨ 불씨 + 🥢 나뭇가지 · 연료 8시간','ember'],
+  ['fuel','🔥','모닥불 연료','🥢 나뭇가지(+4시간) / 🪵 통나무(+12시간) → 🔥 모닥불 (최대 24시간)','campfire'],
   ['relightfire','🔥','모닥불 다시 피우기','✨ 불씨 → 🌫️ 꺼진 모닥불','campfire'],
   ['torch','🕯️','횃불','🥢 나뭇가지 + 🌾 섬유 + ✨ 불씨 · 내구 4 (밤 살피기 1회당 −1)','ember'],
   ['relight','🕯️','횃불 다시 붙이기','꺼진 횃불 → 🔥 모닥불 · 불씨 없이 내구 4','torch'],
@@ -351,7 +356,7 @@ function mk(k) {
   const d = K[k];
   if (d.dur) c.dur = d.dur + (k === 'drill' && hasTrait('firehand') ? 3 : 0);
   if (d.spoil) c.sp = S.t + d.spoil;
-  if (k === 'fire') c.fuel = 180;
+  if (k === 'fire') c.fuel = FUEL.start;
   if (k === 'catcher') c.water = 0;
   if (k === 'ember') c.exp = S.t + (S.tut ? 60 : 30);
   if (k === 'compost') c.items = [];
@@ -390,7 +395,7 @@ function say(m, type = '') { pending.push([m, type]); logMsg(m); }
 function flush() { for (const [m, t] of pending) toast(m, t); pending = []; SND.flushQ(); }
 function toast(m, type = '') {
   const box = $('#toasts');
-  while (box.children.length >= 4) box.firstChild.remove();
+  while (box.children.length >= 3) box.firstChild.remove();
   const d = document.createElement('div'); d.className = 'toast ' + type; d.textContent = m; box.appendChild(d);
   setTimeout(() => d.remove(), type === 'bad' || type === 'disc' ? 3600 : 2400);
 }
@@ -509,6 +514,10 @@ function tempMsg(b0) {
 }
 function heatUp(v, why) { const b0 = tband(); S.temp = clamp(S.temp + v, 28, 43); say(why, 'bad'); tempMsg(b0); }
 function coolDrink() { if (S.temp > TEMP_N) { const b0 = tband(); S.temp = Math.max(TEMP_N, S.temp - .3); tempMsg(b0); return ' 열 −0.3℃'; } return ''; }
+// 〔난이도 완화〕 시간당 감소량 (깨어 있음 / 쉬는 중), 첫 며칠은 더 너그럽게
+const RATE = {h:3, hs:1.5, w:4, ws:1.5};
+const FUEL = {start:480, max:1440, stick:240, plank:240, log:720};
+const easy = (d = day()) => d <= 3 ? .7 : d <= 5 ? .85 : 1;
 function advance(min, mode = 'awake') {
   const rest = mode === 'rest';
   for (let i = 0; i < min && !S.dead && !S.pendingEnd; i++) {
@@ -516,8 +525,9 @@ function advance(min, mode = 'awake') {
     const m = mod();
     const sleepy = rest && !S.storm; // 폭풍 중에는 잠을 못 자서 깨어 있을 때 속도
     // 〔v0.5 확정: 상태 100 기준〕 hunger = 포만감, thirst = 수분 (100 = 가득, 시간이 지나면 줄어듦, 0이면 체력 감소)
-    S.hunger = clamp(S.hunger - (sleepy ? 2 : 4) / 60);
-    let th = (sleepy ? 2 : 5) / 60;
+    const ez = easy();
+    S.hunger = clamp(S.hunger - (sleepy ? RATE.hs : RATE.h) * ez / 60);
+    let th = (sleepy ? RATE.ws : RATE.w) * ez / 60;
     const tb = tband().i; // 미열 수분 감소 +30%, 고열 이상 +60%
     if (tb === 4) th *= 1.3; else if (tb >= 5) th *= 1.6;
     if (S.sick > 0) { th *= 2; S.sick--; if (!S.sick) say('배탈이 가라앉았다.'); }
@@ -632,7 +642,7 @@ function canAct(e) {
   return true;
 }
 function act(min, e, fn, mode) {
-  const cost = e * (isWet() ? 1.5 : 1) * (S.temp < 36 && S.temp >= 35 ? 1.25 : 1); // 오한: 기운 소모 +25%
+  const cost = e * easy() * (isWet() ? 1.5 : 1) * (S.temp < 36 && S.temp >= 35 ? 1.25 : 1); // 오한: 기운 소모 +25% · 첫 며칠 ×0.7/0.85
   S.energy = clamp(S.energy - cost);
   advance(min, mode);
   if (!S.dead && fn) fn();
@@ -693,7 +703,7 @@ function explore(card) {
   }
   if (!canAct(1)) return;
   const st = stackOf(card);
-  act(30, night ? 6 : 4, () => {
+  act(30, night ? 5 : 3, () => {
     SND.q('explore_' + k);
     if (torch) wear(torch);
     if (night) appear('nighteye');
@@ -835,7 +845,7 @@ function fixedInteraction(a, b, bst) {
       return {run:() => { removeCards([a]); b.cook = {k:ak, until:S.t + 20}; SND.q('stack'); learn('sot'); say(`${K[ak].e} ${K[ak].n}을(를) 불에 올렸다. 20분 뒤 익음 (다른 행동·쉬기로 시간이 흘러야 함)`); after(); }};
     }
     if (ak === 'stick' || ak === 'plank' || ak === 'log') {
-      return {run:() => { const add = ak === 'log' ? 360 : 120; removeCards([a]); b.fuel = Math.min(720, b.fuel + add); discover('fuel'); if (S.tut) S.tut.ev.fuel = 1; SND.q('fuel'); say(`🔥 연료 +${add / 60}시간 (남은 연료 ${fmtH(b.fuel)})`); after(); }};
+      return {run:() => { const add = FUEL[ak]; removeCards([a]); b.fuel = Math.min(FUEL.max, b.fuel + add); discover('fuel'); if (S.tut) S.tut.ev.fuel = 1; SND.q('fuel'); say(`🔥 연료 +${add / 60}시간 (남은 연료 ${fmtH(b.fuel)})`); after(); }};
     }
     if (ak === 'torchx' || (ak === 'torch' && a.dur < 4)) {
       return {e:0, run:() => { act(5, 0, () => { a.k = 'torch'; a.dur = 4; discover('relight'); SND.q('ignite'); say('🕯️ 횃불이 다시 붙었다 (내구 4).', 'good'); }); }};
@@ -844,7 +854,7 @@ function fixedInteraction(a, b, bst) {
     return {msg:'불에 올릴 수 없는 카드예요.'};
   }
   if (bk === 'firex') {
-    if (ak === 'ember') return {e:1, run:() => { removeCards([a]); act(10, 1, () => { b.k = 'fire'; b.fuel = 180; discover('relightfire'); if (S.tut) S.tut.ev.fuel = 1; SND.q('ignite'); say('🔥 모닥불을 다시 피웠다 (연료 3시간).', 'good'); }); }};
+    if (ak === 'ember') return {e:1, run:() => { removeCards([a]); act(10, 1, () => { b.k = 'fire'; b.fuel = FUEL.start; discover('relightfire'); if (S.tut) S.tut.ev.fuel = 1; SND.q('ignite'); say(`🔥 모닥불을 다시 피웠다 (연료 ${FUEL.start / 60}시간).`, 'good'); }); }};
     return null;
   }
   if (bk === 'signal' && (ak === 'ember' || (ak === 'torch' && a.dur > 0))) return lightSignal(a, b);
@@ -896,6 +906,7 @@ function toolPair(tool, item, ist) {
   return null;
 }
 function spawnAt(card, st) { // st 자리(없어졌으면 근처)에
+  { const pl = pileFor(card); if (pl) { pl.cards.push(card); flashIds.add(card.id); return; } }
   const pos = st ? {x:st.x, y:st.y} : {x:D.gap, y:D.cellH};
   const live = st && S.stacks.includes(st);
   if (!live && !overlapsAny({x:pos.x, y:pos.y, w:D.cw, h:D.ch})) addStack([card], pos.x, pos.y);
@@ -908,11 +919,19 @@ function handleDrop(drag, target, pos) {
   if (!target) { // 빈 자리로 이동
     src.cards.splice(drag.idx);
     if (!src.cards.length) S.stacks.splice(S.stacks.indexOf(src), 1);
-    const st = addStack(moving, clamp(pos.x, 0, D.W - D.cw), Math.max(0, pos.y));
+    const p = findFree(clamp(pos.x, 0, D.W - D.cw), Math.max(0, pos.y));
+    const st = addStack(moving, p.x, p.y);
     SND.play('drop');
     return after();
   }
-  if (target === src) { SND.play('drop'); return render(); }
+  if (target === src) {
+    // 더미에서 한 장 집어 같은 더미에 다시 놓기 = 같은 카드 2장 조합 (🪨+🪨, 🌾+🌾, 🥢+🥢)
+    if (drag.far && moving.length === 1 && src.cards.length >= 2 && allSame(src.cards) && !FIXED.has(src.cards[0].k)) {
+      const two = src.cards.slice(-2), r2 = exactRecipe(two);
+      if (r2) { if (!canAct(r2.e)) return render(); return craft(r2, {x:src.x, y:src.y, cards:[two[0]], pileSrc:src.cards.length > 2 ? src : null}, [two[1]]); }
+    }
+    SND.play('drop'); return render();
+  }
   const T = target, tRoot = T.cards[0], tTop = T.cards[T.cards.length - 1];
   const a = moving[moving.length - 1];
   if (moving.length === 1 && crewDrop(a, T)) return;
@@ -1025,7 +1044,7 @@ function craft(r, T, moving) {
     const c = mk(r.out);
     if (L_('nul') && S.ship === 'fish' && (r.out === 'spear' || r.out === 'rod')) { c.dur += 4; c.mx = c.dur; }
     if (['rope','spear','rod'].includes(r.id)) learn('nul');
-    if (!overlapsAny({x:pos.x, y:pos.y, w:D.cw, h:D.ch})) addStack([c], pos.x, pos.y); else spawnNear(c, {x:pos.x, y:pos.y, cards:[]});
+    if (!pileFor(c) && !overlapsAny({x:pos.x, y:pos.y, w:D.cw, h:D.ch})) addStack([c], pos.x, pos.y); else spawnNear(c, {x:pos.x, y:pos.y, cards:[]});
     discover(r.id);
     SND.q(r.out === 'fire' || r.out === 'torch' ? 'ignite' : 'craft');
     say(`${K[r.out].e} ${K[r.out].n} 완성 (${rt}분)`);
@@ -1048,7 +1067,17 @@ function findFree(px, py) {
   }
   return best || {x:px + 12, y:py + 12};
 }
+// 새로 생기는 카드는 같은 종류 더미가 있으면 거기에 자동으로 쌓음 (도구·시설·불씨·선원·이야기 카드 제외)
+const NOPILE_CAT = new Set(['place','fac','crew','story','fire','dead','tool']);
+const pileable = k => !FIXED.has(k) && !NOPILE_CAT.has(K[k].cat) && k !== 'ember';
+let flashIds = new Set();
+function pileFor(card) {
+  if (!pileable(card.k)) return null;
+  return S.stacks.find(st => st.cards.length && st.cards[0].k === card.k && allSame(st.cards) && !(drag && drag.stack === st)) || null;
+}
 function spawnNear(card, st) {
+  const pl = pileFor(card);
+  if (pl) { pl.cards.push(card); flashIds.add(card.id); return; }
   const p = findFree(st ? st.x : D.gap, st ? st.y + D.cellH : D.cellH);
   addStack([card], p.x, p.y);
 }
@@ -1103,8 +1132,9 @@ function cardInner(c, st, i) {
   if (d.cat === 'crew') {
     if (isTired(c)) { cls += ' tired'; ft = '지침<br>물·음식 주기'; }
     else {
-      const nt = isNight(), lab = S.storm ? '⛈️ 기지' : (c.h <= 20 || c.w <= 20) ? '😩 허기' : (nt && c.job !== 'fire') ? '🌙 잠' : (JOBNM[c.job] || '').split(' ')[0] + ' 일';
-      ft = `${lab}<br>🍖${Math.round(c.h)} 💧${Math.round(c.w)}`; bar = Math.min(c.h, c.w); if (c.h <= 20 || c.w <= 20) cls += ' hungry';
+      const je = (JOBNM[c.job] || '').split(' ')[0], lab = S.storm ? '⛈️ 기지 대피' : (c.h <= 10 || c.w <= 10) ? '😩 허기' : `${je}${c.act || ACTS[c.job] || ''}`;
+      ft = `<b class="act">${lab}</b><br>🍖${Math.round(c.h)} 💧${Math.round(c.w)}`; bar = Math.min(c.h, c.w); if (c.h <= 20 || c.w <= 20) cls += ' hungry';
+      extra += `<div class="jb">${je}</div>`;
     }
   } else if (d.cat === 'story') ft = isTrace(c) ? `${K[cOf(c).at].e}에<br>올리기` : '탭: 읽기';
   else if (c.k === 'signal') ft = `배 ${S.ships || 0}/3<br>${S.rescueReady ? '🟡 연기' : '횃불 올리기'}`;
@@ -1127,7 +1157,7 @@ function cardInner(c, st, i) {
     }
   } else if (d.dur) { ft = `내구 ${c.dur}/${maxDur(c)}`; bar = c.dur / maxDur(c) * 100; }
   else if (c.k === 'torchx') ft = '모닥불에<br>올리기';
-  else if (c.k === 'fire') { ft = `연료 ${fmtH(c.fuel)}`; bar = c.fuel / 720 * 100; if (c.cook) extra = `<div class="cook">${K[c.cook.k].e}<small>${Math.max(0, c.cook.until - S.t)}분</small></div>`; }
+  else if (c.k === 'fire') { ft = `연료 ${fmtH(c.fuel)}`; bar = c.fuel / FUEL.max * 100; if (c.cook) extra = `<div class="cook">${K[c.cook.k].e}<small>${Math.max(0, c.cook.until - S.t)}분</small></div>`; }
   else if (c.k === 'firex') ft = '불씨 필요';
   else if (c.k === 'ember') ft = `${Math.max(0, c.exp - S.t)}분 뒤<br>꺼짐`;
   else if (c.k === 'catcher') ft = `물 ${c.water}/3`;
@@ -1172,7 +1202,8 @@ function render() {
     });
   }
   for (const [id, el] of els) if (!seen.has(id)) { el.remove(); els.delete(id); }
-  field.style.height = Math.max(D.H, fieldH() + D.cellH) + 'px';
+  if (flashIds.size) { for (const id of flashIds) { const el = els.get(id); if (el) { el.classList.add('newc'); setTimeout(() => el.classList.remove('newc'), 650); } } flashIds = new Set(); }
+  field.style.height = Math.max(D.H, fieldH() + D.cellH + 40) + 'px';
   renderHud();
   tutPaint();
 }
@@ -1205,7 +1236,7 @@ function thermoHTML() { // 〔v0.5 확정: 체온〕 온도계 칩 (추우면 �
 
 /* ---------- 포인터 (드래그 / 탭) ---------- */
 let drag = null;
-const DRAG_PX = 9;
+const DRAG_PX = 10, DRAG_PX_LIFT = 4, LIFT_MS = 260;
 function fieldPt(e) { const r = $('#field').getBoundingClientRect(); return {x:e.clientX - r.left, y:e.clientY - r.top}; }
 function cardFromEl(el) {
   const id = +el.dataset.id;
@@ -1221,12 +1252,14 @@ $('#field').addEventListener('pointerdown', e => {
   let idx = hit.i;
   if (isPile(hit.st)) idx = e.target.closest('[data-pile]') ? 0 : hit.st.cards.length - 1;
   drag = {pid:e.pointerId, sx:e.clientX, sy:e.clientY, t0:performance.now(), stack:hit.st, idx, card:hit.st.cards[idx], moved:false};
+  const d0 = drag, liftEl = els.get(hit.st.cards[hit.st.cards.length - 1].id);
+  drag.liftT = setTimeout(() => { if (drag === d0 && !d0.moved) { d0.lifted = true; if (liftEl) { liftEl.classList.add('lift'); d0.liftEl = liftEl; } } }, LIFT_MS);
 });
 window.addEventListener('pointermove', e => {
   if (!drag || e.pointerId !== drag.pid) return;
   e.preventDefault();
   if (!drag.moved) {
-    if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < DRAG_PX) return;
+    if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < (drag.lifted ? DRAG_PX_LIFT : DRAG_PX)) return;
     startDrag(e);
   }
   moveDrag(e);
@@ -1234,7 +1267,7 @@ window.addEventListener('pointermove', e => {
 window.addEventListener('pointerup', e => endPointer(e, false));
 window.addEventListener('pointercancel', e => endPointer(e, true));
 function startDrag(e) {
-  drag.moved = true;
+  drag.moved = true; clearTimeout(drag.liftT); if (drag.liftEl) drag.liftEl.classList.remove('lift');
   SND.play('pickup');
   const st = drag.stack;
   drag.cards = st.cards.slice(drag.idx);
@@ -1253,9 +1286,11 @@ function moveDrag(e) {
   const t = findTarget(e);
   const hlEl = t ? els.get(t.cards[t.cards.length - 1].id) : null;
   if (drag.hl !== hlEl) { if (drag.hl) drag.hl.classList.remove('hl'); if (hlEl) hlEl.classList.add('hl'); drag.hl = hlEl; }
-  // 가장자리 자동 스크롤
-  const b = $('#board'), br = b.getBoundingClientRect();
-  if (e.clientY > br.bottom - 36) b.scrollTop += 10; else if (e.clientY < br.top + 30) b.scrollTop -= 10;
+  if (!drag.far && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 40) drag.far = true;
+  // 가장자리 자동 스크롤: 가장자리 밖에서 들어왔을 때만, 천천히 (아래쪽 카드를 집자마자 화면이 밀리던 문제)
+  const b = $('#board'), br = b.getBoundingClientRect(), inEdge = e.clientY > br.bottom - 30 || e.clientY < br.top + 26;
+  if (!inEdge) drag.edgeOk = true;
+  if (drag.edgeOk && drag.far && inEdge) b.scrollTop += e.clientY > br.bottom - 30 ? 6 : -6;
 }
 function findTarget(e) {
   const el = document.elementFromPoint(e.clientX, e.clientY);
@@ -1276,9 +1311,10 @@ function endPointer(e, cancel) {
   if (!drag || e.pointerId !== drag.pid) return;
   const d = drag;
   if (d.hl) d.hl.classList.remove('hl');
+  clearTimeout(d.liftT); if (d.liftEl) d.liftEl.classList.remove('lift');
   if (!d.moved) {
     drag = null;
-    if (!cancel && performance.now() - d.t0 < 700) onTap(d.card);
+    if (!cancel && !d.lifted) onTap(d.card); // 짧게 누른 것만 탭 (꾹 누른 뒤 그냥 떼면 아무 일도 안 함)
     return;
   }
   const target = cancel ? null : findTarget(e);
@@ -1955,7 +1991,7 @@ function feedCrew(food, cc) {
     SND.q(d.cat === 'water' ? 'drink' : 'eat');
     cc.h = clamp((cc.h || 0) + (d.eat.h || 0)); cc.w = clamp((cc.w || 0) + (d.eat.t || 0)); cc.zero = 0;
     if (isTired(cc)) {
-      cc.k = 'cw_' + c.id; cc.h = Math.max(cc.h, 50); cc.w = Math.max(cc.w, 50); cc.job = 'base'; cc.workH = 0;
+      cc.k = 'cw_' + c.id; cc.h = Math.max(cc.h, 50); cc.w = Math.max(cc.w, 50); cc.job = 'base'; cc.act = '기지 대기';
       S.crew.st[c.id] = 'mate'; rosterOf(c.id).met = 1; saveMeta(); SND.q('discover');
       say(`🙌 "선장님…!" ${c.role[sIdx()]} ${c.n}${josa(c.n, '이', '가')} 동료가 됐다.`, 'disc');
     } else say(`${d.e} ${c.n}에게 ${d.n}을(를) 줬다. 포만감 ${Math.round(cc.h)} · 수분 ${Math.round(cc.w)}`);
@@ -1978,8 +2014,8 @@ function assignJob(m, root) {
     const n = mates().filter(x => x !== m && PLACE_JOB.includes(x.job)).length;
     if (n >= placeCap()) { toast(`장소에 데리고 다닐 수 있는 선원은 ${placeCap()}명이에요${hasHut() ? '' : ' (🛖 오두막이 있으면 3명)'}. 나머지는 🏕️ 기지·🔥 모닥불에서 일해요.`, 'bad'); SND.play('reject'); return render(); }
   }
-  m.job = j; SND.play('stack');
-  say(`${c.e} ${c.n}: ${JOBNM[j]} 맡음 (낮에 일함)`);
+  m.job = j; m.act = j === 'fire' ? '불 지킴' : ACTS[j]; SND.play('stack');
+  say(`${c.e} ${c.n}: ${JOBNM[j]} 맡음 — 알아서 계속 일해요`);
   after();
 }
 function crewDrop(a, T) {
@@ -2006,28 +2042,38 @@ function give(k, nearSt) {
 const placeSt = k => S.stacks.find(st => st.cards.length === 1 && st.cards[0].k === k);
 function crewRoll(k, m) {
   const P = S.places[k], rare = k === 'flat' ? 2 : 3;
-  let tbl = dropTable(k).map(([rk, pr, pool], i) => [rk, pr * (m.k === 'cw_kong' && i >= rare ? 1.5 : 1) * (m.k === 'cw_dal' && S.ship === 'fish' && rk === 'bigclam' ? 2 : 1), pool]);
-  let roll = rnd() * 100;
-  for (const [rk, pr, pool] of tbl) { if (roll < pr) { const p = P.pools[pool]; if (p[0] > 0) { p[0]--; give(rk, placeSt(k)); } return; } roll -= pr; }
+  const tbl = dropTable(k).map(([rk, pr, pool], i) => [rk, pr * (m.k === 'cw_kong' && i >= rare ? 1.5 : 1) * (m.k === 'cw_dal' && S.ship === 'fish' && rk === 'bigclam' ? 2 : 1), pool]);
+  for (let tr = 0; tr < 2; tr++) { // 빈손이면 한 번 더 둘러봄
+    let roll = rnd() * 100;
+    for (const [rk, pr, pool] of tbl) {
+      if (roll < pr) { const p = P.pools[pool]; if (p[0] > 0) { p[0]--; give(rk, placeSt(k)); return rk; } break; }
+      roll -= pr;
+    }
+  }
+  return null;
 }
+const ACTS = {beach:'살피는 중', sea:'살피는 중', flat:'살피는 중', jungle:'살피는 중', ledge:'살피는 중', base:'기지 대기', fire:'불 지킴', signal:'배 지켜봄'};
 function crewWork(m) {
   const c = cOf(m), j = m.job;
   if (PLACE_JOB.includes(j)) {
-    if (j === 'flat' && !flatOpen()) return;
+    if (j === 'flat' && !flatOpen()) { m.act = '물 참 (썰물 대기)'; return; }
     if (c.id === 'gom' && j === 'jungle') {
       const tool = allCards().find(x => x.k === 'knife' && x.dur > 0) || allCards().find(x => x.k === 'sharp' && x.dur > 0);
       const p = S.places.jungle.pools.log;
-      if (tool && p[0] > 0) { p[0]--; wear(tool); give('log', placeSt('jungle')); return; }
+      if (tool && p[0] > 0) { p[0]--; wear(tool); give('log', placeSt('jungle')); m.act = '통나무 벰 🪵'; return; }
     }
     if (c.id === 'hal' && j === 'sea' && S.ship === 'fish') {
       const tool = allCards().find(x => x.k === 'rod' && x.dur > 0) || allCards().find(x => x.k === 'spear' && x.dur > 0);
       const p = S.places.sea.pools.fish;
-      if (tool) { wear(tool); if (p[0] > 0 && rnd() < (tool.k === 'rod' ? .8 : .7)) { p[0]--; give('fish', placeSt('sea')); } return; }
+      if (tool) { wear(tool); if (p[0] > 0 && rnd() < (tool.k === 'rod' ? .8 : .7)) { p[0]--; give('fish', placeSt('sea')); m.act = '낚시 🐟'; } else m.act = '낚시 (허탕)'; return; }
     }
-    return crewRoll(j, m);
+    const got = crewRoll(j, m);
+    m.act = got ? `살핌 → ${K[got].e}` : (Object.values(S.places[j].pools).every(p => p[0] <= 0) ? '자원 없음' : '살핌 (빈손)');
+    return;
   }
   if (j === 'base') {
-    if (c.id === 'nul') { const fs = allCards().filter(x => x.k === 'fiber').slice(0, 2); if (fs.length === 2) { removeCards(fs); give('rope', placeSt('base')); } }
+    m.act = '기지 대기';
+    if (c.id === 'nul') { const fs = allCards().filter(x => x.k === 'fiber').slice(0, 2); if (fs.length === 2) { removeCards(fs); give('rope', placeSt('base')); m.act = '노끈 만듦 🧶'; } else m.act = '섬유 기다림'; }
     if (c.id === 'dal' && S.ship === 'cargo') {
       for (const f of allCards().filter(x => FAC[x.k])) {
         if (fdOf(f) > fmax(f.k) * .7) continue;
@@ -2035,15 +2081,43 @@ function crewWork(m) {
         if (!mat) continue;
         const add = FAC[f.k].fix[mat.k === 'vine' ? 'rope' : mat.k];
         removeCards([mat]); f.fd = Math.min(fmax(f.k), fdOf(f) + add); if (f.fd > fmax(f.k) * .3) delete f.fdw;
-        S.crewGain['🔨' + K[f.k].n] = (S.crewGain['🔨' + K[f.k].n] || 0) + 1; break;
+        S.crewGain['🔨' + K[f.k].n] = (S.crewGain['🔨' + K[f.k].n] || 0) + 1; m.act = '보수 🔨'; break;
       }
     }
   }
+  if (j === 'signal') m.act = '배 지켜봄';
 }
-function crewFire(m) {
-  const f = allCards().find(x => x.k === 'fire'); if (!f) return;
-  if (f.fuel < 90) { const fuel = allCards().find(x => x.k === 'stick' || x.k === 'plank'); if (fuel) { removeCards([fuel]); f.fuel = Math.min(720, f.fuel + 120); S.crewGain['🔥연료'] = (S.crewGain['🔥연료'] || 0) + 1; } }
-  if (cOf(m).id === 'sot' && !f.cook) { const raw = allCards().find(x => K[x.k].cook && !isMate(x)); if (raw) { removeCards([raw]); f.cook = {k:raw.k, until:S.t + 20, crew:1}; } }
+const RAWOK = x => K[x.k].cook && !isMate(x) && !isTired(x);
+function crewFire(m, dayTime) {
+  const f = allCards().find(x => x.k === 'fire');
+  if (!f) { m.act = allCards().some(x => x.k === 'firex') ? '불 꺼짐 (✨ 필요)' : '모닥불 없음'; return; }
+  const done = [];
+  // 6시간 아래로 떨어지면 보드의 땔감(🥢→🪵 순)을 넣음. 낮에는 18시간치가 될 때까지 주변에서 나뭇가지를 주워 와 밤새 버틸 연료를 비축
+  let fed = false;
+  if (f.fuel < 360) {
+    const fuel = allCards().find(x => x.k === 'stick' && !isTired(x)) || allCards().find(x => x.k === 'plank') || allCards().find(x => x.k === 'log');
+    if (fuel) { removeCards([fuel]); f.fuel = Math.min(FUEL.max, f.fuel + FUEL[fuel.k]); S.crewGain['🔥연료'] = (S.crewGain['🔥연료'] || 0) + 1; done.push(`땔감 넣음${K[fuel.k].e}`); fed = true; }
+  }
+  if (!fed && dayTime && f.fuel < 1080) { f.fuel = Math.min(FUEL.max, f.fuel + FUEL.stick); S.crewGain['🔥땔감 주움'] = (S.crewGain['🔥땔감 주움'] || 0) + 1; done.push('땔감 주움🥢'); }
+  if (dayTime) {
+    let n = cOf(m).id === 'sot' ? 2 : 1, cooked = 0;
+    while (n-- > 0) { const raw = allCards().find(RAWOK); if (!raw) break; const out = K[raw.k].cook; removeCards([raw]); give(out, stackOf(f)); discover('cook_' + out); cooked++; }
+    if (cooked) { done.push(`굽는 중${cooked > 1 ? '×' + cooked : ''}`); }
+  }
+  m.actFull = done.join(' · ');
+  m.act = done.length ? done[done.length - 1] : '불 지킴';
+}
+function crewEat(m) {
+  let ate = false;
+  if (m.h < 50) {
+    const f = allCards().find(x => COOKED.has(x.k)) || allCards().find(x => canFeed(x) && !isMate(x) && !isTired(x) && K[x.k].cat === 'food' && !K[x.k].raw && (K[x.k].eat.h || 0) > 0) || allCards().find(x => canFeed(x) && !isMate(x) && !isTired(x) && K[x.k].raw);
+    if (f) { removeCards([f]); m.h = clamp(m.h + (K[f.k].eat.h || 0) + 10); m.w = clamp(m.w + (K[f.k].eat.t || 0)); ate = true; }
+  }
+  if (m.w < 50) {
+    const w = allCards().find(x => x.k === 'rainw' || x.k === 'cocoo');
+    if (w) { removeCards([w]); m.w = clamp(m.w + K[w.k].eat.t + 10); m.h = clamp(m.h + (K[w.k].eat.h || 0)); ate = true; }
+  }
+  if (ate) S.crewGain['🍽️식사'] = (S.crewGain['🍽️식사'] || 0) + 1;
 }
 function crewFeedAll() {
   const sot = mateOf('sot'); if (!sot || sot.h <= 20 || sot.w <= 20) return;
@@ -2056,16 +2130,20 @@ function crewFeedAll() {
 }
 function crewHour(m) {
   if (!S.crew) return;
-  const h = m / 60, dayWork = m >= 420 && m <= 1080;
-  if (m === 360) for (const c of mates()) c.workH = 0;
+  const h = m / 60, dayWork = m >= 360 && m <= 1080;
   for (const c of crewCards()) {
-    c.h = clamp((c.h || 0) - 3); c.w = clamp((c.w || 0) - 4);
+    c.h = clamp((c.h || 0) - 1.5); c.w = clamp((c.w || 0) - 2);
+    if (isMate(c)) crewEat(c);
     if (c.h <= 0 || c.w <= 0) { c.zero = (c.zero || 0) + 60; if (c.zero === 60) say(`⚠️ ${cOf(c).n}${josa(cOf(c).n, '이', '가')} ${c.h <= 0 ? '굶주리고' : '목말라하고'} 있다! 24시간이 지나면 떠나요.`, 'bad'); }
     else c.zero = 0;
     if (c.zero >= 1440) { const cr = cOf(c); removeCards([c]); S.crew.st[cr.id] = 'gone'; say(`😢 ${cr.n}${josa(cr.n, '이', '가')} 견디지 못하고 떠났다. (이번 삶에서는 다시 볼 수 없어요)`, 'bad'); continue; }
-    if (!isMate(c) || S.storm || c.h <= 20 || c.w <= 20) continue;
-    if (c.job === 'fire') crewFire(c);
-    if (dayWork && c.job && c.job !== 'fire' && (c.workH || 0) < 8) { c.workH = (c.workH || 0) + 1; crewWork(c); }
+    if (!isMate(c)) continue;
+    if (S.storm) { c.act = '기지 대피'; continue; }
+    if (c.h <= 10 || c.w <= 10) { c.act = '허기 (음식·물 필요)'; continue; }
+    if (!c.job) { c.act = '할 일 없음'; continue; }
+    if (c.job === 'fire') { crewFire(c, dayWork); continue; }
+    if (!dayWork) { c.act = '잠'; continue; }
+    crewWork(c);
   }
   if (m === 360 || m === 1080) crewFeedAll();
   if (m === 1080 && L_('hal')) { const d = day() + 1; S.nextRain = rnd() < Math.min(.40, .20 + .01 * (d - 1)); say(`🌬️ (바람 읽기) 내일은 ${S.nextRain ? '🌧️ 비가 온다' : '☀️ 맑다'}.`); }
@@ -2196,8 +2274,8 @@ function showMate(m) {
   $('#sheet').dataset.modal = '';
   sheet(`<h2>${c.e} ${c.n} <span class="muted">${c.role[i]}</span></h2>
     <p>${c.pers}</p>
-    <p>포만감 <b>${Math.round(m.h)}</b> · 수분 <b>${Math.round(m.w)}</b> · 일: <b>${JOBNM[m.job] || '없음'}</b> (오늘 ${m.workH || 0}/8시간)<br>
-    <span class="muted">음식·물 카드를 올려 먹여요. 20 이하면 일하지 않고, 0인 채 24시간이면 떠나요. 밤(18~06시)과 폭풍에는 기지에서 쉬어요.</span></p>
+    <p>일: <b>${JOBNM[m.job] || '없음'}</b> — 지금: <b>${m.job === 'fire' && m.actFull ? m.actFull : (m.act || '대기')}</b><br>포만감 <b>${Math.round(m.h)}</b> · 수분 <b>${Math.round(m.w)}</b><br>
+    <span class="muted">한 번 맡기면 알아서 계속해요 (장소는 낮 06~18시 매시간, 모닥불은 밤에도 땔감). 배고프면 보드의 음식·물을 스스로 먹어요. 0인 채 24시간이면 떠나요.</span></p>
     <p>잘하는 일: ${c.job[i]}</p>
     <p>✦ 선장이 배우기: <b>${ab[0]}</b> — ${ab[1]}<br>${L_(c.id) ? '배움 완료 (이번 삶에서만)' : `${what} ${S.lc[c.id] || 0}/${need} (이 선원이 곁에 있을 때)`}</p>
     <div class="btns"><button data-act="mateBase" data-id="${m.id}">🏕️ 기지로 보내기</button><button class="pri" data-close>닫기</button></div>`);
@@ -2362,7 +2440,7 @@ function boot() {
   if (!meta.seenHelp) showHelp();
 }
 function sortBoardIfOff() { if (S.stacks.some(st => st.x + D.cw > D.W + 2)) sortBoard(true); }
-window.__game = {tut:{TUT, tutCur, tutSteps, tutStart, tutEnd}, story:{CREW, mates, mateOf, crewHour, learn, endingFlow, finishEnding, DBG, showIntro, closeIntro, homeN, homeAll, pickCrew, SHIPS, END}, fi:(a, b) => fixedInteraction(a, b, stackOf(b)), snd:SND, tide:{open:() => flatOpen(), windows:tideWindows}, get S() { return S; }, get meta() { return meta; }, sortBoard, render, D, K, advance:(m) => { advance(m); after(); }};
+window.__game = {R:RATE, FUEL, easy, tut:{TUT, tutCur, tutSteps, tutStart, tutEnd}, story:{CREW, mates, mateOf, crewHour, learn, endingFlow, finishEnding, DBG, showIntro, closeIntro, homeN, homeAll, pickCrew, SHIPS, END}, fi:(a, b) => fixedInteraction(a, b, stackOf(b)), snd:SND, tide:{open:() => flatOpen(), windows:tideWindows}, get S() { return S; }, get meta() { return meta; }, sortBoard, render, D, K, advance:(m) => { advance(m); after(); }};
 boot();
 </script>
 </body>
