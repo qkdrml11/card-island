@@ -38,13 +38,16 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
 .bar2 .tr i{display:block;height:100%;border-radius:6px;transition:width .3s}
 .bar2 .v{width:24px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
 .bar2.bad .v{color:#ff9b85}
-#board{position:relative;flex:1;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;
+#board{position:relative;flex:1;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:none;scrollbar-width:none;
   background:linear-gradient(#e9d7a8,#d9c08a);transition:background .6s}
 #app.night #board{background:linear-gradient(#26364f,#1a2638)}
 #app.rain #board{box-shadow:inset 0 0 60px rgba(70,110,160,.45)}
 #app.storm #board{background:linear-gradient(#4a5260,#2c333d);box-shadow:inset 0 0 90px rgba(20,30,60,.7)}
 #hud .r1{overflow:hidden}
-#field{position:relative;width:100%;min-height:100%}
+#board::-webkit-scrollbar{display:none}
+#field{position:relative;width:100%;min-height:100%;background-image:radial-gradient(rgba(60,40,10,.13) 1.2px,transparent 1.6px);background-size:26px 26px}
+#app.night #field{background-image:radial-gradient(rgba(255,255,255,.07) 1.2px,transparent 1.6px)}
+#board.panning{cursor:grabbing}
 #toolbar{flex:none;display:flex;gap:6px;padding:6px 8px;background:var(--hud);touch-action:manipulation}
 #toolbar #bHelp,#toolbar #bMenu{flex:.55}
 #toolbar #bSort{flex:.8}
@@ -66,16 +69,16 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
   display:flex;flex-direction:column;align-items:center;overflow:hidden;box-shadow:0 2px 4px rgba(0,0,0,.25);
   animation:pop .22s ease-out;transition:transform .12s}
 @keyframes pop{from{transform:scale(.6);opacity:.2}to{transform:scale(1);opacity:1}}
-.ci .nm{width:100%;height:22px;line-height:21px;text-align:center;font-size:calc(var(--cw)*.158);font-weight:800;
+.ci .nm{width:100%;height:22px;line-height:21px;text-align:center;font-size:calc(var(--cw)*.172);font-weight:800;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 3px;letter-spacing:-.4px;background:rgba(0,0,0,.07);flex:none}
 .ci .em{font-size:calc(var(--cw)*.42);line-height:1;margin-top:3px;flex:none}
-.ci .ft{font-size:calc(var(--cw)*.138);line-height:1.15;margin-top:3px;text-align:center;font-weight:600;opacity:.85;padding:0 2px;letter-spacing:-.3px}
+.ci .ft{font-size:calc(var(--cw)*.152);line-height:1.15;margin-top:3px;text-align:center;font-weight:600;opacity:.85;padding:0 2px;letter-spacing:-.3px}
 .ci .br{position:absolute;left:6px;right:6px;bottom:4px;height:4px;background:rgba(0,0,0,.15);border-radius:3px;overflow:hidden}
 .ci .br i{display:block;height:100%;background:#3c9d5d}
 .ci.frail .br i{background:#e2574c} .ci.frail .ft{color:#c0392b;font-weight:700}
 .ci.pl .em{margin-right:24px}
-.ci .badge{position:absolute;right:2px;top:25px;min-width:30px;height:26px;line-height:26px;padding:0 5px;border-radius:12px;
-  background:#1d2b2f;color:#fff;font-size:13px;font-weight:800;text-align:center}
+.ci .badge{position:absolute;right:2px;top:22px;min-width:26px;height:24px;line-height:24px;padding:0 4px;border-radius:12px;
+  background:#1d2b2f;color:#fff;font-size:12.5px;font-weight:800;text-align:center}
 .ci .cook{position:absolute;right:2px;top:22px;background:#fff;border-radius:8px;padding:1px 3px;font-size:16px;line-height:1.1;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .ci .cook small{display:block;font-size:9px;font-weight:700}
 .c-place{background:#d6f0e4;border-color:#2f7d5d}
@@ -147,6 +150,29 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
 .muted{color:#7a6a48;font-size:13px}
 #tut{flex:none;display:flex;align-items:center;gap:6px;background:#fff3c4;color:#3a2a00;padding:5px 7px;font-size:13px;font-weight:700;border-bottom:2px solid #d9a400;line-height:1.3;min-height:44px;touch-action:manipulation}
 #tut[hidden]{display:none}
+#goal{flex:none;display:flex;align-items:center;gap:6px;background:#e3f4ee;color:#143c34;padding:4px 8px;font-size:13px;font-weight:700;border-bottom:2px solid #5bb39a;min-height:36px;touch-action:manipulation;cursor:pointer;white-space:nowrap}
+#goal[hidden]{display:none}
+#goal .gt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.3px}
+#goal .gp{flex:none;background:#2f7d5d;color:#fff;border-radius:9px;padding:1px 7px;font-size:12px}
+#goal .gx{flex:none;opacity:.55;font-size:15px}
+#goal.pop{animation:goalpop .7s ease-out}
+@keyframes goalpop{0%{background:#9ce3c9;transform:scale(.97)}100%{background:#e3f4ee;transform:none}}
+#sheet .gsteps{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0 2px}
+#sheet .gsteps span{font-size:18px;width:32px;height:32px;line-height:32px;text-align:center;border-radius:9px;background:#efe6cf}
+#sheet .gsteps span.done{background:#cdebd9}
+#sheet .gsteps span.cur{background:#ffd36b;outline:2px solid #d9a400}
+#sheet .gsteps span.next{filter:grayscale(1);opacity:.45}
+#sheet .bf{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid #eadfc4}
+#sheet .bf .e{font-size:26px;width:34px;text-align:center;flex:none}
+#sheet .bf .m{flex:1;min-width:0;font-size:14px;line-height:1.3}
+#sheet .bf .m small{color:#6b5c3c;font-size:12px}
+#sheet .bf .dbar{display:block;height:6px;background:rgba(0,0,0,.12);border-radius:4px;overflow:hidden;margin:3px 0 1px}
+#sheet .bf .dbar i{display:block;height:100%;background:#3c9d5d}
+#sheet .bf.low .dbar i{background:#e2574c}
+#sheet .bf button{min-height:40px;padding:0 10px;flex:none;font-size:14px}
+#sheet .bf .ok{flex:none;font-size:12px;color:#2f7d5d;font-weight:700}
+#sheet .beds{background:#f6ecd2;border-radius:10px;padding:7px 9px;margin:8px 0;font-size:14px;line-height:1.5}
+#sheet .beds.low{background:#fde3dc}
 #tut .tn{flex:none;background:#c98f00;color:#fff;border-radius:9px;padding:1px 5px;font-size:11px}
 #tut .tt{flex:1;letter-spacing:-.3px}
 #tut .hk{display:inline-block;background:#fff;border:1px solid #e0b100;border-radius:7px;padding:0 5px;font-size:12.5px;white-space:nowrap;letter-spacing:0}
@@ -161,7 +187,8 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
 #sheet .rcp.ess{opacity:.8}
 #sheet .rcp .tag{font-size:11px;background:#ffe08a;border-radius:6px;padding:0 5px;margin-left:4px;font-weight:700}
 .c-crew{background:#e7e2ff;border-color:#5a4bb0}
-.c-crew .ft{font-size:calc(var(--cw)*.13)}
+.c-crew .ft{font-size:calc(var(--cw)*.143)}
+.ci.bedlow .ft b.bd{color:#c0392b}
 .c-story{background:#f3ead6;border-color:#8a6d3b;border-style:dashed}
 .ci.tired{background:#ddd6f3;border-style:dashed}
 .ci.hungry .ft{color:#c0392b;font-weight:700}
@@ -190,6 +217,7 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:non
     <div id="bars"></div>
   </header>
   <div id="tut" hidden></div>
+  <div id="goal" hidden></div>
   <main id="board"><div id="field"></div></main>
   <footer id="toolbar">
     <button id="bSort" class="pri">정렬</button>
@@ -264,6 +292,9 @@ const fdOf = c => c.fd === undefined ? fmax(c.k) : c.fd;
 const fixList = k => Object.entries(FAC[k].fix).map(([m, v]) => `${K[m].e}${K[m].n} +${v}`).join(', ');
 const FIXED = new Set(['beach','sea','flat','jungle','ledge','base','valley','cave','fire','firex','bed','catcher','windbreak','fence','hut','compost']);
 // 버리기(🌊 얕은 바다): 도구·장소·시설·불은 못 버림 / 퇴비 더미에 넣을 수 있는 것
+// 🏕️ 기지 안 시설: 보드에 따로 놓이지 않고 기지 카드 안(S.fac)에 들어감. 모닥불·빗물 받이·퇴비 더미·신호대·뗏목은 보드에 남음 (자주 올리고 탭하는 카드)
+const BASEFAC = new Set(['bed','windbreak','fence','hut']);
+const BED_MAX = 8; // 침상(바람막이 포함) 최대 = 선장 + 선원 7
 const canDiscard = c => !FIXED.has(c.k) && !['tool','place','fac','crew'].includes(K[c.k].cat);
 const COMPOSTABLE = new Set(['rotten','bone','weed']);
 const COMPOST_MAX = 3, COMPOST_MIN = 1440;
@@ -281,7 +312,7 @@ const RECIPES = [
   {id:'knife', out:'knife', inp:{sharp:1, flint:1, stick:1}, t:20, e:2},
   {id:'spear', out:'spear', inp:{sharp:1, stick:1, rope:1}, t:20, e:2},
   {id:'rod', out:'rod', inp:{stick:1, rope:1, clam:1}, t:20, e:2},
-  {id:'bed', out:'bed', inp:{leaf:2}, t:10, e:1, unique:['bed','windbreak'], fac:1},
+  {id:'bed', out:'bed', inp:{leaf:2}, t:10, e:1, fac:1}, // 한 사람당 1개 (최대 BED_MAX)
   {id:'catcher', out:'catcher', inp:{leaf:1, stick:1}, t:10, e:1, unique:['catcher'], fac:1}, // 〔물 완화〕 잎 2 → 1
   {id:'reedrope', out:'rope', inp:{reed:2}, t:10, e:1},
   {id:'windbreak', out:'windbreak', inp:{bed:1, rope:1, stick:2}, t:40, e:5, unique:['windbreak'], up:'bed'},
@@ -319,11 +350,11 @@ const BOOK = [
   ['cook_eggc','🍳','구운 새알','🥚 새알 → 🔥 모닥불 (20분)','campfire'],
   ['cook_rfishc','🍢','구운 민물고기','🐟 민물고기 → 🔥 모닥불 (20분)','campfire'],
   ['cook_boilw','🍵','끓인 물','🫗 강물 / 💧 고인 빗물 → 🔥 모닥불 (20분) · 배탈 없음, 수분 +35','campfire'],
-  ['bed','🛏️','침상','🍃 잎 ×2 더미 → 🏕️ 기지에 올리기 · 쉬기 기운 +8/시간 · 내구 9 (🍃 잎으로 보수)'],
+  ['bed','🛏️','침상','🍃 잎 ×2 더미 → 🏕️ 기지 (기지 안에 들어감) · 한 사람당 1개, 모자라면 바닥에서 잠 · 쉬기 기운 +8/시간 · 내구 9 (🍃 잎으로 보수)'],
   ['catcher','🪣','빗물 받이','🍃 잎 + 🥢 나뭇가지 더미 → 🏕️ 기지에 올리기 · 비 오면 1시간마다 1잔, 맑아도 아침 이슬 1잔 (최대 4) · 내구 10'],
-  ['windbreak','⛺','바람막이','🛏️ 침상 위에 🧶 노끈 + 🥢 나뭇가지 ×2 (또는 그 더미를 🏕️ 기지에) · 쉬기 +9, 비 피해 절반, 비에 몸이 안 식음, 폭풍 피해 줄임 · 내구 20 (🍃·🥢·🧶로 보수)','bed'],
-  ['fence','🚧','울타리','🪵 통나무 ×3 더미 → 🏕️ 기지에 올리기 · 밤짐승 차단 · 내구 30 (🪵로 보수)','chop'],
-  ['hut','🛖','오두막','🚧 울타리 위에 🪵 통나무 ×2 + 🍃 잎 ×3 (또는 그 더미를 🏕️ 기지에) · 폭풍 차단, 쉬기 +12, 밤 추위 막음, 안에서 쉬면 몸이 데워짐 · 내구 40 (🪵·🍃로 보수)','fence'],
+  ['windbreak','⛺','바람막이','🧶 노끈 + 🥢 나뭇가지 ×2 더미 → 🏕️ 기지 (기지 안 침상 하나가 바람막이로, 침상 수는 그대로) · 쉬기 +9, 비 피해 절반, 비에 몸이 안 식음, 폭풍 피해 줄임 · 내구 20 (🍃·🥢·🧶로 보수)','bed'],
+  ['fence','🚧','울타리','🪵 통나무 ×3 더미 → 🏕️ 기지 (기지 안) · 밤짐승 차단 · 내구 30 (🪵로 보수)','chop'],
+  ['hut','🛖','오두막','🪵 통나무 ×2 + 🍃 잎 ×3 더미 → 🏕️ 기지 (기지 안 울타리가 오두막으로) · 폭풍 차단, 쉬기 +12, 밤 추위 막음, 안에서 쉬면 몸이 데워짐 · 내구 40 (🪵·🍃로 보수)','fence'],
   ['compost','🪱','퇴비 더미','🥢 나뭇가지 ×2 + 🍃 잎 ×2 더미 → 🏕️ 기지에 올리기 · 상한 음식 처리'],
   ['humus','🟤','퇴비','🤢 상한 음식 / 🦴 생선뼈 / 🌱 해초 → 🪱 퇴비 더미 · 24시간 뒤 (최대 3개 동시) · 농사용(다음 빌드)','compost'],
   ['river','🏞️','강 (민물)','🌴 정글 탐사 50%에 열림 · 살피면 🫗 강물·🐟 민물고기·🎋 갈대·🪨 돌 · 강물은 끓여 마시면 안전'],
@@ -383,7 +414,7 @@ const day = (t = S.t) => Math.floor(t / 1440) + 1;
 const mod = (t = S.t) => t % 1440;
 const isNight = (t = S.t) => { const m = mod(t); return m >= 1080 || m < 360; };
 const hasTrait = id => S && S.life.traits.includes(id);
-const allCards = () => S.stacks.flatMap(s => s.cards);
+const allCards = () => S.stacks.flatMap(s => s.cards).concat(S.fac || []); // 기지 안 시설 포함
 const findKind = k => allCards().find(c => c.k === k);
 const stackOf = card => S.stacks.find(s => s.cards.includes(card));
 
@@ -403,7 +434,7 @@ function maxDur(c) { return c.mx || K[c.k].dur + (c.k === 'drill' && hasTrait('f
 
 function newGame(traits, naked, ship, pre) {
   S = {v:VERSION, st100:1, t:420, hp:100, energy:100, hunger:80, thirst:80, temp:36.5, sick:0, injured:0, rain:false, rainStreak:0, storm:0, stormStart:0, stormEnd:0,
-       stacks:[], places:initPools(), nid:1, dead:false, scored:false, lastCause:'',
+       stacks:[], fac:[], goal:{i:0}, places:initPools(), nid:1, dead:false, scored:false, lastCause:'',
        life:{traits:traits || [], naked:!!naked, surv:0, storms:0, newRecipes:[], newPlaces:[]}, log:[], flags:{},
        ship:ship || null, crew:ship ? {alive:pickCrew(), st:{}} : null, learned:{}, lc:{}, flatN:0, ships:0, rescueReady:0, calmDay:0, crewGain:{}, canStay:!!ship && homeAll()};
   if (pre) S.pre = 1;
@@ -423,7 +454,31 @@ function removeCards(list) {
   const set = new Set(list);
   for (const st of S.stacks) st.cards = st.cards.filter(c => !set.has(c));
   S.stacks = S.stacks.filter(st => st.cards.length);
+  if (S.fac) S.fac = S.fac.filter(c => !set.has(c));
 }
+// 보드에 놓인 기지 시설(예전 저장·테스트)은 기지 안으로 옮김
+function facSync() {
+  if (!S) return false;
+  if (!S.fac) S.fac = [];
+  let moved = false;
+  for (const st of S.stacks) if (st.cards.some(c => BASEFAC.has(c.k))) {
+    for (const c of st.cards) if (BASEFAC.has(c.k)) { delete c.pin; S.fac.push(c); }
+    st.cards = st.cards.filter(c => !BASEFAC.has(c.k)); moved = true;
+  }
+  if (moved) { S.stacks = S.stacks.filter(st => st.cards.length); S.fac.sort((a, b) => KORDER.indexOf(a.k) - KORDER.indexOf(b.k)); }
+  return moved;
+}
+const baseSt = () => S.stacks.find(st => st.cards.length === 1 && st.cards[0].k === 'base');
+// 🛏️ 침상은 한 사람당 하나: 선장이 먼저(바람막이가 있으면 선장 자리), 다음은 자는 동료, 불 지키는 동료는 마지막
+const bedCards = () => (S.fac || []).filter(c => c.k === 'windbreak').concat((S.fac || []).filter(c => c.k === 'bed'));
+function bedPlan() {
+  const beds = bedCards(), ms = S.crew ? mates() : [];
+  const order = ms.filter(m => m.job !== 'fire').concat(ms.filter(m => m.job === 'fire'));
+  const ppl = [{n:'선장', e:'🧑‍✈️'}].concat(order.map(m => ({m, n:cOf(m).n, e:cOf(m).e})));
+  ppl.forEach((p, i) => { p.bed = beds[i] ? beds[i].k : null; });
+  return {beds:beds.length, n:ppl.length, ppl, cap:ppl[0].bed, floor:ppl.filter(p => !p.bed)};
+}
+const bedStr = (bp = bedPlan()) => `🛏️ 침상 ${bp.beds}/${bp.n}`;
 
 /* ---------- 메시지 ---------- */
 function logMsg(m) { S.log.push(`[${day()}일 ${clockStr()}] ${m}`); if (S.log.length > 80) S.log.shift(); }
@@ -496,11 +551,12 @@ function facWear() {
   if (br.length) breakFac(br, '폭풍에');
 }
 function breakFac(list, why) { removeCards(list); SND.q('break'); say(`💥 ${why} ${list.map(c => K[c.k].e + ' ' + K[c.k].n).join('·')}이(가) 부서졌다.`, 'bad'); }
+// 선장 잠자리: 침상이 있으면 오두막 12 / 바람막이 9 / 침상 8. 침상이 없으면 바닥: 오두막 안 8, 밖 5 (+밤에 몸이 0.1℃/시간 더 식음)
+const FLOOR = {r:5, hut:8, cool:.1};
 function restRate() {
-  if (findKind('hut')) return {r:12, nm:'오두막', hut:true};
-  if (findKind('windbreak')) return {r:9, nm:'바람막이', wb:true};
-  if (findKind('bed')) return {r:8, nm:'침상'};
-  return {r:6, nm:'맨바닥'};
+  const hut = hasHut(), bed = bedPlan().cap;
+  if (bed) { if (hut) return {r:12, nm:'오두막 · 침상', hut:true, bed}; if (bed === 'windbreak') return {r:9, nm:'바람막이 침상', wb:true, bed}; return {r:8, nm:'침상', bed}; }
+  return hut ? {r:FLOOR.hut, nm:'오두막 바닥 (침상 없음)', hut:true, floor:1} : {r:FLOOR.r, nm:'맨바닥 (침상 없음)', floor:1};
 }
 /* ---------- 〔v0.5 확정: 체온·폭풍 강화〕 체온 (℃, 정상 36.5, 임시값) ----------
    식힘(/시간): 폭풍 중이면 폭풍 값만 (오두막 0 / 바람막이 0.25 / 없음 0.5), 아니면 비(바람막이·오두막 없을 때) 0.15 + 밤 야외(오두막 없을 때) 0.1
@@ -519,6 +575,7 @@ function tempRate(rest) {
   let cool = 0, warm = 0, fever = 0;
   if (S.storm) cool = hut ? 0 : wb ? .25 : .5;
   else { if (S.rain && !hut && !wb) cool += .15; if (n && !hut) cool += .1; }
+  if (rest && n && !hut && !S.storm && !bedPlan().cap) cool += FLOOR.cool; // 침상 없이 바닥에서 자면 더 식음
   if (S.repairing && S.storm) cool += REPAIR_COOL; // 〔v0.5 확정: 시설 내구도·보수〕 폭풍 속 보수 작업 중 추가 식힘
   if (findKind('fire')) warm += .3;
   if (rest && hut) warm += .4;
@@ -542,6 +599,10 @@ function stepTemp(rest) {
 function tempMsg(b0) {
   const b = tband();
   if (b.i === b0.i) return;
+  // 36.0℃·37.5℃ 경계에서 오르락내리락할 때 같은 알림이 몇 분마다 반복되지 않게 (2시간에 한 번)
+  const mild = i => i >= 2 && i <= 4;
+  if (mild(b.i) && mild(b0.i) && S.tmT !== undefined && S.t - S.tmT < 120) return;
+  S.tmT = S.t;
   const worse = Math.abs(b.i - 3) > Math.abs(b0.i - 3);
   const msg = {0:'🥶 심한 저체온! 체력 −8/시간 — 당장 몸을 녹이자', 1:'🥶 저체온! 체력 −3/시간, 기운 회복 절반 — 🔥 모닥불이나 🛖 오두막으로', 2:'🥶 오한이 든다 (기운 소모 +25%)',
                4:'🤒 미열이 난다 (수분 −30% 더 빨리)', 5:'🤒 고열! 체력 −3/시간, 수분 −60% 더 빨리 — 쉬면서 물을 마시자', 6:'🔥 위험한 고열! 체력 −8/시간'};
@@ -637,7 +698,8 @@ function dawn() {
   S.rain = S.nextRain !== undefined ? S.nextRain : rnd() < p; delete S.nextRain;
   S.rainStreak = S.rain ? S.rainStreak + 1 : 0;
   for (const c of allCards()) if (c.k === 'catcher' && c.water < 4) c.water++; // 아침 이슬
-  say(`🌅 ${d}일차 아침. 살아남았다 (생존 ${S.life.surv}일)${S.rain ? ` — 🌧️ 비가 온다${S.rainStreak > 1 ? ` (${S.rainStreak}일째)` : ''}` : ''}`, 'good');
+  const bp = bedPlan();
+  say(`🌅 ${d}일차 아침. 살아남았다 (생존 ${S.life.surv}일)${S.rain ? ` — 🌧️ 비가 온다${S.rainStreak > 1 ? ` (${S.rainStreak}일째)` : ''}` : ''} · ${bedStr(bp)}${bp.floor.length ? ` (바닥: ${bp.floor.map(p => p.n).join('·')})` : ''}`, bp.floor.length ? '' : 'good');
   if (d % 7 === 0) say('⚠️ 오늘 12:00부터 내일 06:00까지 큰 폭풍이 온다! 오두막과 비축 식량·물을 준비하자.', 'bad');
   else if (hasTrait('stormsense') && (d + 1) % 7 === 0) say('⚠️ (폭풍 감각) 내일 12:00 큰 폭풍이 온다.', 'bad');
   if (S.rainStreak >= 3 && !S.storm) startStorm('small', S.t + 720);
@@ -689,6 +751,7 @@ function after() {
   checkPlaces();
   if (S.crew) crewGainFlush();
   if (S.tut) tutCheck();
+  if (S.goal) goalCheck();
   if (S.pendingEnd && !S.dead) { const pe = S.pendingEnd; delete S.pendingEnd; if (pe.type === 'rescue') { saveRun(); render(); flush(); return endingFlow('rescue', mates().map(m => cOf(m).id)); } }
   if (S.dead) die();
   saveRun(); render(); flush();
@@ -812,6 +875,17 @@ function drinkCatcher(card) {
 }
 
 /* ---------- 쉬기 ---------- */
+const FACFX = {bed:'쉬기 +8 · 1명', windbreak:'쉬기 +9 · 1명 · 비·폭풍 막음', fence:'밤짐승 막음', hut:'폭풍 막음 · 쉬기 +12 · 동료 3명'};
+function repairMat(c) { for (const m of Object.keys(FAC[c.k].fix)) for (const k of m === 'rope' ? ['rope', 'vine'] : [m]) { const f = freeCards(k); if (f.length) return f[f.length - 1]; } return null; }
+function facRowHTML(c) {
+  const Fm = fmax(c.k), v = fdOf(c), hurt = v < Fm - 1e-6, mat = hurt ? repairMat(c) : null;
+  return `<div class="bf${v <= Fm * .3 ? ' low' : ''}"><span class="e">${K[c.k].e}</span><span class="m"><b>${K[c.k].n}</b> <small>${FACFX[c.k] || ''}</small><span class="dbar"><i style="width:${v / Fm * 100}%"></i></span><small>내구 ${Math.ceil(v - 1e-6)}/${Fm}${hurt && !mat ? ' · 보수: ' + Object.keys(FAC[c.k].fix).map(k => K[k].e).join('') : ''}</small></span>${hurt ? `<button data-act="fix" data-id="${c.id}" ${mat ? '' : 'disabled'}>🔨 ${mat ? K[mat.k].e : '재료 없음'}</button>` : '<span class="ok">튼튼</span>'}</div>`;
+}
+function baseHTML() {
+  const F = S.fac || [], bp = bedPlan();
+  const beds = `<div class="beds${bp.beds < bp.n ? ' low' : ''}"><b>${bedStr(bp)}</b> · ${bp.ppl.map(p => `${p.e}${p.n} ${p.bed ? '🛏️' : '<b>바닥</b>'}`).join(' · ')}${bp.beds < bp.n ? '<br><span class="muted">🍃 잎 ×2 더미를 기지에 올리면 침상 +1. 침상 없이 자면 기운이 덜 차고 몸이 식어요.</span>' : ''}</div>`;
+  return `<h2>🏕️ 기지</h2>${F.length ? F.map(facRowHTML).join('') : '<p class="muted">아직 빈 터. 재료 더미를 기지 카드에 올리면 시설이 안에 들어와요 (🍃×2 = 🛏️ 침상).</p>'}${beds}`;
+}
 function openRest() {
   if (S.dead) return;
   $('#sheet').dataset.modal = '';
@@ -824,11 +898,10 @@ function openRest() {
   if (S.hunger <= 20 || S.thirst <= 20) mult.push('포만감/수분 20↓ ×0.5');
   if (tband().i <= 1) mult.push('저체온 ×0.5');
   const tr = tempRate(true), tb = tband();
-  sheet(`<h2>🏕️ 기지에서 쉬기</h2>
+  sheet(`${baseHTML()}<h3>💤 쉬기</h3>
     <p>자리: <b>${rr.nm}</b> (기운 +${rr.r}/시간${mult.length ? ', ' + mult.join(', ') : ''})<br>
     <span class="muted">쉬는 동안 포만감 −${+(RATE.hs * easy()).toFixed(2)}, 수분 −${+(RATE.ws * easyW()).toFixed(2)} /시간. 포만감·수분 둘 다 30 초과면 체력 +2/시간.</span><br>
-    🌡️ 체온 ${S.temp.toFixed(1)}℃ ${tb.nm} → 쉬는 동안 ${Math.abs(tr.net) < .005 ? '그대로' : (tr.net > 0 ? '+' : '−') + Math.abs(tr.net).toFixed(2) + '℃/시간'}${tr.net > 0 && S.temp < TEMP_N && !tr.fever ? ' (36.5까지)' : ''}<br>
-    <span class="muted">몸을 데우는 것: 🔥 모닥불, 🛖 오두막에서 쉬기, 맑은 낮. 식히는 것: 비, 밤 바깥, 폭풍. 열은 쉬면서 물을 마시면 내려요.</span></p>
+    🌡️ 체온 ${S.temp.toFixed(1)}℃ ${tb.nm} → 쉬는 동안 ${Math.abs(tr.net) < .005 ? '그대로' : (tr.net > 0 ? '+' : '−') + Math.abs(tr.net).toFixed(2) + '℃/시간'}${tr.net > 0 && S.temp < TEMP_N && !tr.fever ? ' (36.5까지)' : ''}</p>
     <div class="btns">
       <button class="pri" data-rest="60">1시간 쉬기</button>
       <button data-rest="180">3시간 쉬기</button>
@@ -838,8 +911,8 @@ function openRest() {
 }
 function rest(min) {
   closeSheet();
-  const e0 = S.energy;
-  act(min, 0, () => say(`💤 ${Math.round(min / 60 * 10) / 10}시간 쉬었다. 기운 +${Math.round(S.energy - e0)}`), 'rest');
+  const e0 = S.energy, fl = restRate().floor;
+  act(min, 0, () => say(`💤 ${Math.round(min / 60 * 10) / 10}시간 쉬었다. 기운 +${Math.round(S.energy - e0)}${fl ? ' · 침상이 없어 바닥에서 잤다 (회복 ↓, 몸이 식음)' : ''}`, fl ? 'bad' : ''), 'rest');
 }
 
 /* ---------- 드롭 처리 ---------- */
@@ -862,8 +935,19 @@ function partialRecipe(cs) { const c = counts(cs); return RECIPES.some(r => subC
 function fixedInteraction(a, b, bst) {
   const ak = a.k, bk = b.k;
   if (FAC[bk]) { // 〔v0.5 확정: 시설 내구도·보수〕 재료를 올려 보수
+    const rp = repairFac(a, b), mat = ak === 'vine' ? 'rope' : ak;
+    if (rp && rp.run) return rp;
+    if (rp && rp.msg && !RECIPES.some(r => r.up === bk && r.inp[mat])) return {msg:rp.msg};
+  }
+  return fixedRest(a, b, bst);
+}
+// 시설 보수: 재료 a 한 장 → 시설 b (20분, 폭풍 중 40분). 보드 위 시설(빗물 받이)·기지 안 시설 공통
+function repairFac(a, b) {
+  const ak = a.k, bk = b.k;
+  {
     const Fb = FAC[bk], mat = ak === 'vine' ? 'rope' : ak, add = Fb.fix[mat] && Fb.fix[mat] * (L_('nul') && S.ship === 'cargo' ? 1.5 : 1), Fmax = fmax(bk);
-    if (add && fdOf(b) < Fmax - 1e-6) {
+    if (!add) return null;
+    if (fdOf(b) < Fmax - 1e-6) {
       const storm = !!S.storm, t = (storm ? 40 : 20) * (L_('dal') && S.ship === 'cargo' ? .5 : 1);
       return {e:1, run:() => {
         removeCards([a]); S.repairing = 1;
@@ -877,8 +961,11 @@ function fixedInteraction(a, b, bst) {
         } finally { S.repairing = 0; }
       }};
     }
-    if (add && !RECIPES.some(r => r.up === bk && r.inp[mat])) return {msg:`${K[bk].e} ${K[bk].n}은(는) 아직 튼튼해요 (내구 ${Fmax}/${Fmax}).`};
+    return {msg:`${K[bk].e} ${K[bk].n}은(는) 아직 튼튼해요 (내구 ${Fmax}/${Fmax}).`, full:1};
   }
+}
+function fixedRest(a, b, bst) {
+  const ak = a.k, bk = b.k;
   if (bk === 'fire') {
     if (K[ak].cook) {
       if (b.cook) return {msg:'🔥 이미 굽는 중이에요 (모닥불 조리 1개).'};
@@ -961,7 +1048,7 @@ function handleDrop(drag, target, pos) {
   if (!target) { // 빈 자리로 이동
     src.cards.splice(drag.idx);
     if (!src.cards.length) S.stacks.splice(S.stacks.indexOf(src), 1);
-    const p = findFree(clamp(pos.x, 0, D.W - D.cw), Math.max(0, pos.y));
+    const p = findFree(clamp(pos.x, 0, D.FW - D.cw), Math.max(0, pos.y));
     const st = addStack(moving, p.x, p.y);
     SND.play('drop');
     return after();
@@ -1042,22 +1129,32 @@ function facHint(cs) {
   const r = facMatch(cs);
   if (r && !(r.unique && r.unique.some(u => existsOutside(u, cs)))) toast(`🏕️ 이 더미를 기지에 올리면 ${K[r.out].e} ${K[r.out].n}을(를) 지어요.`);
 }
-// 🏕️ 기지 위에 재료 더미를 올림 → 시설 짓기 (업그레이드는 있는 시설과 합쳐서)
-function baseDrop(moving, src, idx, baseSt) {
-  const blocked = r => r.unique && r.unique.some(u => existsOutside(u, moving));
+// 기지 시설을 지을 수 있는지 (침상은 BED_MAX까지, 나머지는 하나씩)
+function facBlock(r, ings) {
+  if (r.id === 'bed' && bedCards().length >= BED_MAX) return `🛏️ 침상은 ${BED_MAX}개까지예요.`;
+  if (r.unique && r.unique.some(u => existsOutside(u, ings))) return `${K[r.out].e} ${K[r.out].n}은(는) 이미 있어요.`;
+  return '';
+}
+const facT = (k, bs = baseSt()) => { const c = (S.fac || []).find(x => x.k === k); return c && bs ? {x:bs.x, y:bs.y + D.cellH, cards:[c], inBase:1} : null; };
+const facWorst = mat => (S.fac || []).filter(c => FAC[c.k].fix[mat] && fdOf(c) < fmax(c.k) - 1e-6).sort((x, y) => fdOf(x) / fmax(x.k) - fdOf(y) / fmax(y.k))[0] || null;
+// 🏕️ 기지 위에 재료 더미를 올림 → 시설 짓기 (기지 안으로) · 업그레이드 · 보수
+function baseDrop(moving, src, idx, bst) {
   const r = RECIPES.find(x => x.fac && eqCounts(counts(moving), x.inp));
-  if (r && !blocked(r)) return craft(r, {x:baseSt.x, y:baseSt.y + D.cellH, cards:[]}, moving);
-  if (r) { toast(`${K[r.out].e} ${K[r.out].n}은(는) 이미 있어요.`); SND.play('reject'); return render(); }
+  if (r) { const why = facBlock(r, moving); if (!why) return craft(r, {x:bst.x, y:bst.y + D.cellH, cards:[]}, moving); toast(why); SND.play('reject'); return render(); }
   for (const u of RECIPES.filter(x => x.up)) {
-    const fst = S.stacks.find(st => st.cards.length === 1 && st.cards[0].k === u.up);
-    if (fst && eqCounts(counts([fst.cards[0]].concat(moving)), u.inp) && !blocked(u)) return craft(u, fst, moving);
+    const fst = BASEFAC.has(u.up) ? facT(u.up, bst) : S.stacks.find(st => st.cards.length === 1 && st.cards[0].k === u.up);
+    if (fst && eqCounts(counts([fst.cards[0]].concat(moving)), u.inp) && !facBlock(u, moving)) return craft(u, fst, moving);
+  }
+  if (allSame(moving)) { // 보수 재료 한 장 → 가장 많이 닳은 기지 시설
+    const a = moving[moving.length - 1], tg = facWorst(a.k === 'vine' ? 'rope' : a.k);
+    if (tg) { const rp = repairFac(a, tg); if (rp && rp.run) { if (!canAct(rp.e)) return render(); rp.run(); return; } }
   }
   const c = counts(moving);
   const near = RECIPES.filter(x => (x.fac || x.up) && subCounts(c, x.inp)).map(x => {
     const miss = Object.entries(x.inp).map(([k, n]) => [k, n - (c[k] || 0)]).filter(([, n]) => n > 0);
     return `${K[x.out].e} ${K[x.out].n}: ${miss.map(([k, n]) => K[k].n + (n > 1 ? ' ×' + n : '')).join(', ')} 더 필요`;
   });
-  toast(near.length ? '🏕️ ' + near.slice(0, 2).join(' / ') : '🏕️ 기지에는 시설 재료 더미를 올려요 (침상·빗물 받이·울타리·퇴비 더미·신호대·뗏목). 쉬기는 기지를 탭.');
+  toast(near.length ? '🏕️ ' + near.slice(0, 2).join(' / ') : '🏕️ 기지에는 시설 재료 더미를 올려요 (침상·빗물 받이·울타리·퇴비 더미·신호대·뗏목). 기지를 탭하면 기지 안을 봐요.');
   SND.play('reject'); render();
 }
 // 🌊 얕은 바다에 버리기 (0분). 상한 음식·생선뼈는 15%로 다음 해변/얕은 바다 살피기에 게 +1
@@ -1093,10 +1190,12 @@ function craft(r, T, moving) {
     const c = mk(r.out);
     if (L_('nul') && S.ship === 'fish' && (r.out === 'spear' || r.out === 'rod')) { c.dur += 4; c.mx = c.dur; }
     if (['rope','spear','rod'].includes(r.id)) learn('nul');
-    if (!pileFor(c) && !overlapsAny({x:pos.x, y:pos.y, w:D.cw, h:D.ch})) { addStack([c], pos.x, pos.y); if (keepPin) c.pin = 1; } else spawnNear(c, {x:pos.x, y:pos.y, cards:[]});
+    const inBase = BASEFAC.has(r.out);
+    if (inBase) { if (!S.fac) S.fac = []; S.fac.push(c); S.fac.sort((x, y) => KORDER.indexOf(x.k) - KORDER.indexOf(y.k)); const bs = baseSt(); if (bs) flashIds.add(bs.cards[0].id); }
+    else if (!pileFor(c) && !overlapsAny({x:pos.x, y:pos.y, w:D.cw, h:D.ch})) { addStack([c], pos.x, pos.y); if (keepPin) c.pin = 1; } else spawnNear(c, {x:pos.x, y:pos.y, cards:[]});
     discover(r.id);
     SND.q(r.out === 'fire' || r.out === 'torch' ? 'ignite' : 'craft');
-    say(`${K[r.out].e} ${K[r.out].n} 완성 (${rt}분)`);
+    say(`${K[r.out].e} ${K[r.out].n} 완성 (${rt}분)${inBase ? ' → 🏕️ 기지 안' + (r.out === 'bed' || r.out === 'windbreak' ? ' · ' + bedStr() : '') : ''}`, inBase ? 'good' : '');
   });
 }
 
@@ -1106,9 +1205,9 @@ function overlapsAny(r, ignore) {
   return S.stacks.some(st => st !== ignore && st.x < r.x + r.w - 6 && st.x + D.cw > r.x + 6 && st.y < r.y + r.h - 6 && st.y + stackH(st) > r.y + 6);
 }
 function findFree(px, py) {
-  const rows = Math.max(12, Math.ceil(fieldH() / D.cellH) + 4);
+  const rows = Math.max(Math.ceil(D.FH / D.cellH), Math.ceil(fieldH() / D.cellH) + 4);
   let best = null, bd = Infinity;
-  for (let r = 0; r < rows; r++) for (let c = 0; c < 5; c++) {
+  for (let r = 0; r < rows; r++) for (let c = 0; c < D.cols; c++) {
     const x = D.gap + c * (D.cw + D.gap), y = D.gap + r * D.cellH;
     if (overlapsAny({x, y, w:D.cw, h:D.ch})) continue;
     const d = (x - px) ** 2 + ((y - py) ** 2) * 1.3;
@@ -1136,7 +1235,7 @@ const isPinned = st => !!(st && st.cards[0] && st.cards[0].pin);
 function sortBoard(silent) {
   const places = [], fixed = [], mixed = [], byKind = {};
   const pinned = S.stacks.filter(isPinned), pinPile = {};
-  for (const st of pinned) { st.x = Math.max(0, Math.min(st.x, D.W - D.cw)); st.y = Math.max(0, st.y); const k = st.cards[0].k; if (allSame(st.cards) && !FIXED.has(k) && !pinPile[k]) pinPile[k] = st; }
+  for (const st of pinned) { st.x = Math.max(0, Math.min(st.x, D.FW - D.cw)); st.y = Math.max(0, st.y); const k = st.cards[0].k; if (allSame(st.cards) && !FIXED.has(k) && !pinPile[k]) pinPile[k] = st; }
   for (const st of S.stacks) {
     if (isPinned(st)) continue;
     const k0 = st.cards[0].k;
@@ -1153,18 +1252,19 @@ function sortBoard(silent) {
   });
   const pr = pinned.map(st => ({x:st.x, y:st.y, h:stackH(st)}));
   const hitPin = (x, y, h) => pr.some(q => x < q.x + D.cw + 2 && x + D.cw > q.x - 2 && y < q.y + q.h + 2 && y + h > q.y - 2);
-  const out = pinned.slice();
-  let y = D.gap, col = 0, rowH = 0;
+  const out = pinned.slice(), bd = $('#board'), step = D.cw + D.gap; // 지금 보이는 곳 왼쪽 위부터
+  const ox = Math.max(0, Math.min(Math.round(bd.scrollLeft / step) * step, (D.cols - D.vc) * step)), oy = Math.round(bd.scrollTop);
+  let y = oy + D.gap, col = 0, rowH = 0;
   const nl = () => { y += rowH + 10; col = 0; rowH = 0; };
   const place = st => {
     const h = stackH(st);
     for (let g = 0; g < 2000; g++) {
-      if (col >= 5) nl();
-      const x = D.gap + col * (D.cw + D.gap); col++;
+      if (col >= D.vc) nl();
+      const x = ox + D.gap + col * step; col++;
       if (hitPin(x, y, h)) continue;
       st.x = x; st.y = y; rowH = Math.max(rowH, h); out.push(st); return;
     }
-    st.x = D.gap; st.y = y; out.push(st);
+    st.x = ox + D.gap; st.y = y; out.push(st);
   };
   const baseSt = places.find(st => st.cards[0].k === 'base');
   places.filter(st => st !== baseSt).forEach(place);
@@ -1183,13 +1283,19 @@ function cardMenu(card) {
 }
 /* ---------- 그리기 ---------- */
 const els = new Map();
+const BOARD_X = 1.8, BOARD_Y = 1.8; // 보드 = 화면의 가로 1.8배 · 세로 1.8배 (빈 곳을 끌어 이동)
+function fieldW() { let m = 0; if (S) for (const st of S.stacks) m = Math.max(m, st.x + D.cw); return m + D.gap; }
 function measure() {
   const b = $('#board');
   D.W = b.clientWidth; D.H = b.clientHeight;
-  D.cw = Math.min(92, Math.floor((D.W - D.gap * 6) / 5));
+  D.cw = Math.min(84, Math.floor((D.W - D.gap * 6) / 5 * .9)); // 카드 살짝 작게 (390px에서 70 → 63)
   D.ch = Math.round(D.cw * 1.36);
-  D.mo = Math.max(22, Math.round(D.ch * .25));
+  D.mo = Math.max(20, Math.round(D.ch * .25));
   D.cellH = D.ch + 12;
+  D.vc = Math.max(4, Math.min(8, Math.floor((D.W - D.gap) / (D.cw + D.gap)))); // 화면에 보이는 칸 수 (정렬 한 줄)
+  D.FW = Math.max(D.W, Math.round(D.W * BOARD_X)); D.cols = Math.floor((D.FW - D.gap) / (D.cw + D.gap));
+  D.FH = Math.round(Math.max(D.H, 420) * BOARD_Y);
+  $('#field').style.width = Math.max(D.FW, fieldW()) + 'px';
   document.documentElement.style.setProperty('--cw', D.cw + 'px');
   document.documentElement.style.setProperty('--ch', D.ch + 'px');
 }
@@ -1209,7 +1315,11 @@ function cardInner(c, st, i) {
   else if (c.k === 'raft' || c.k === 'bigraft') ft = `🌊에 올려 출항<br>선장+${c.k === 'raft' ? 2 : 4}`;
   else if (d.cat === 'place') {
     if (d.locked) { cls += ' locked'; ft = '준비 중'; }
-    else if (c.k === 'base') { const rr = restRate(); ft = `탭: 쉬기<br>${rr.nm}`; }
+    else if (c.k === 'base') {
+      const bp = bedPlan(), F = S.fac || [], ic = (F.some(x => x.k === 'windbreak') ? '⛺' : '') + (F.some(x => x.k === 'hut') ? '🛖' : F.some(x => x.k === 'fence') ? '🚧' : '');
+      ft = `${ic || '탭: 열기'}<br><b class="bd">🛏️${bp.beds}/${bp.n}</b>`; if (bp.beds < bp.n) cls += ' bedlow';
+      if (F.length) { const lo = Math.min(...F.map(x => fdOf(x) / fmax(x.k))); bar = lo * 100; if (lo <= .3) cls += ' frail'; }
+    }
     else if (c.k === 'flat') {
       const P = S.places.flat.pools.all, open = flatOpen();
       ft = open ? `썰물 ~${clockStr(lowTideEnd())}<br>자원 ${P[0] / P[1] > .6 ? '많음' : P[0] / P[1] > .2 ? '조금' : '없음'}` : (S.storm ? '폭풍<br>닫힘' : `물 참<br>썰물 ${whenStr(nextLowTide())}`);
@@ -1237,7 +1347,7 @@ function cardInner(c, st, i) {
   else if (c.k === 'compost') { const it = c.items || []; ft = it.length ? `썩는 중 ${it.length}/${COMPOST_MAX}<br>${Math.max(0, Math.ceil((Math.min(...it.map(x => x.until)) - S.t) / 60))}시간 뒤` : '상한 음식<br>넣기'; if (it.length) bar = (1 - (Math.min(...it.map(x => x.until)) - S.t) / COMPOST_MIN) * 100; }
   else if (c.k === 'humus') ft = '농사용<br>(다음 빌드)';
   else if (c.k === 'rotten') ft = '먹으면 배탈<br>🌊에 버리기';
-  else if (c.sp) { const h = Math.max(0, Math.ceil((c.sp - S.t) / 60)); ft = `${d.raw ? '날것 · ' : ''}${h}시간 뒤<br>상함`; }
+  else if (c.sp) { const h = Math.max(0, Math.ceil((c.sp - S.t) / 60)); ft = d.raw ? `날것·${h}시간<br>뒤 상함` : `${h}시간 뒤<br>상함`; }
   else if (d.eat) { ft = [d.eat.h ? `포만감+${d.eat.h}` : '', d.eat.t ? `수분+${d.eat.t}` : ''].filter(Boolean).join('<br>'); if (d.eat.sick && d.eat.sick < 1) ft += '<br>⚠ 배탈 위험'; }
   else if (d.closed) ft = '깨야 함';
   if (c.k === 'rotten') cls += ' rotten';
@@ -1246,6 +1356,7 @@ function cardInner(c, st, i) {
 }
 function render() {
   if (!S) return;
+  facSync();
   const field = $('#field');
   const seen = new Set(); let z = 1;
   for (const st of S.stacks) {
@@ -1272,9 +1383,11 @@ function render() {
   }
   for (const [id, el] of els) if (!seen.has(id)) { el.remove(); els.delete(id); }
   if (flashIds.size) { for (const id of flashIds) { const el = els.get(id); if (el) { el.classList.add('newc'); setTimeout(() => el.classList.remove('newc'), 650); } } flashIds = new Set(); }
-  field.style.height = Math.max(D.H, fieldH() + D.cellH + 40) + 'px';
+  field.style.height = Math.max(D.FH, fieldH() + D.cellH + 40) + 'px';
+  field.style.width = Math.max(D.FW, fieldW()) + 'px';
   renderHud();
   tutPaint();
+  goalPaint();
 }
 function renderHud() {
   SND.update(S);
@@ -1356,11 +1469,58 @@ function moveDrag(e) {
   const hlEl = t ? els.get((t === drag.stack ? t.cards[drag.idx - 1] : t.cards[t.cards.length - 1]).id) : null;
   if (drag.hl !== hlEl) { if (drag.hl) drag.hl.classList.remove('hl'); if (hlEl) hlEl.classList.add('hl'); drag.hl = hlEl; }
   if (!drag.far && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 40) drag.far = true;
-  // 가장자리 자동 스크롤: 가장자리 밖에서 들어왔을 때만, 천천히 (아래쪽 카드를 집자마자 화면이 밀리던 문제)
-  const b = $('#board'), br = b.getBoundingClientRect(), inEdge = e.clientY > br.bottom - 30 || e.clientY < br.top + 26;
-  if (!inEdge) drag.edgeOk = true;
-  if (drag.edgeOk && drag.far && inEdge) b.scrollTop += e.clientY > br.bottom - 30 ? 6 : -6;
+  // 가장자리 자동 스크롤: 가장자리 밖에서 들어왔을 때만 (가장자리 카드를 집자마자 화면이 밀리지 않게), 대고 있는 동안 계속
+  drag.last = {clientX:e.clientX, clientY:e.clientY};
+  const dir = edgeDir(e);
+  if (!dir) drag.edgeOk = true;
+  if (dir && drag.edgeOk && drag.far && !edgeRAF) edgeRAF = requestAnimationFrame(edgeTick);
 }
+const EDGE = 34, EDGE_V = 9;
+let edgeRAF = 0;
+function edgeDir(e) {
+  const br = $('#board').getBoundingClientRect();
+  const dx = e.clientX < br.left + EDGE ? -1 : e.clientX > br.right - EDGE ? 1 : 0, dy = e.clientY < br.top + EDGE - 6 ? -1 : e.clientY > br.bottom - EDGE ? 1 : 0;
+  return dx || dy ? {dx, dy} : null;
+}
+function edgeTick() {
+  const d = drag && drag.moved && drag.last ? edgeDir(drag.last) : null;
+  if (!d || !drag.edgeOk) { edgeRAF = 0; return; }
+  const b = $('#board'), sl = b.scrollLeft, st = b.scrollTop;
+  b.scrollLeft += d.dx * EDGE_V; b.scrollTop += d.dy * EDGE_V;
+  if (b.scrollLeft !== sl || b.scrollTop !== st) moveDrag(drag.last);
+  edgeRAF = requestAnimationFrame(edgeTick);
+}
+/* 빈 곳을 한 손가락으로 끌면 보드 이동 (카드 위는 카드 끌기·탭·꾹 누르기 그대로). 손을 떼면 살짝 미끄러짐 */
+let pan = null, panRAF = 0;
+$('#board').addEventListener('pointerdown', e => {
+  if (drag || (e.button !== undefined && e.button > 0) || e.target.closest('.card')) return;
+  cancelAnimationFrame(panRAF); panRAF = 0;
+  const b = $('#board');
+  pan = {pid:e.pointerId, x:e.clientX, y:e.clientY, sl:b.scrollLeft, st:b.scrollTop, moved:false, hist:[[performance.now(), e.clientX, e.clientY]]};
+});
+window.addEventListener('pointermove', e => {
+  if (!pan || e.pointerId !== pan.pid) return;
+  const dx = e.clientX - pan.x, dy = e.clientY - pan.y;
+  if (!pan.moved && Math.hypot(dx, dy) < 4) return;
+  pan.moved = true; e.preventDefault();
+  const b = $('#board'); b.classList.add('panning');
+  b.scrollLeft = pan.sl - dx; b.scrollTop = pan.st - dy;
+  pan.hist.push([performance.now(), e.clientX, e.clientY]); if (pan.hist.length > 6) pan.hist.shift();
+}, {passive:false});
+function panEnd(e) {
+  if (!pan || e.pointerId !== pan.pid) return;
+  const p = pan; pan = null; $('#board').classList.remove('panning');
+  if (!p.moved) return;
+  const now = performance.now(), h = p.hist.filter(x => now - x[0] < 90);
+  if (h.length < 2) return;
+  const dt = Math.max(16, h[h.length - 1][0] - h[0][0]);
+  let vx = -(h[h.length - 1][1] - h[0][1]) / dt * 16, vy = -(h[h.length - 1][2] - h[0][2]) / dt * 16;
+  const b = $('#board');
+  const step = () => { if (Math.hypot(vx, vy) < .4) { panRAF = 0; return; } b.scrollLeft += vx; b.scrollTop += vy; vx *= .92; vy *= .92; panRAF = requestAnimationFrame(step); };
+  if (Math.hypot(vx, vy) > 1.5) panRAF = requestAnimationFrame(step);
+}
+window.addEventListener('pointerup', panEnd);
+window.addEventListener('pointercancel', panEnd);
 // 드롭 판정 (손가락 기준 넉넉하게): 손가락이 대상(여유 14px 포함) 위에 있거나, 끌던 카드가 대상과 22% 이상 겹치면 붙음. 여러 개면 가장 많이 겹친 대상
 const DROP_PAD = 14, DROP_AREA = .22;
 function findTarget(e) {
@@ -1487,18 +1647,18 @@ const CT = [
   {c:'water', id:null, o:['🪣','빗물 받이 물 마시기'], inp:[['catcher',1]], t:5, n:'🪣 빗물 받이 탭 · 수분 +25, 배탈 없음'},
   {c:'water', id:'river', o:['🏞️','강 살피기'], inp:[['valley',1]], t:30, n:'🌴 정글 탐사 50%에 열림 · 🫗 강물·🐟 민물고기·🎋 갈대·🪨 돌'},
   {c:'water', id:null, o:['💧','바위턱 웅덩이'], inp:[['ledge',1]], t:30, n:'⛰️ 바위턱 살피기 → 💧 고인 빗물 (비 오면 더 많이) · 그냥 마시면 배탈 25%'},
-  {c:'fac', id:'bed', o:'bed', inp:[['leaf',2]], on:'base', t:10, n:'한 더미로 → 🏕️ 기지 · 쉬기 기운 +8/시간'},
+  {c:'fac', id:'bed', o:'bed', inp:[['leaf',2]], on:'base', t:10, n:'한 더미로 → 🏕️ 기지 안 · 한 사람당 1개 · 쉬기 +8/시간'},
   {c:'fac', id:'catcher', o:'catcher', inp:[['leaf',1],['stick',1]], on:'base', t:10, n:'한 더미로 → 🏕️ 기지'},
-  {c:'fac', id:'windbreak', o:'windbreak', inp:[['bed',1],['rope',1],['stick',2]], t:40, n:'🛏️ 침상 위에 🧶+🥢🥢 (또는 더미를 🏕️에) · 비·폭풍 피해 줄임'},
-  {c:'fac', id:'fence', o:'fence', inp:[['log',3]], on:'base', t:90, n:'한 더미로 → 🏕️ 기지 · 밤짐승 차단'},
-  {c:'fac', id:'hut', o:'hut', inp:[['fence',1],['log',2],['leaf',3]], t:180, n:'🚧 울타리 위에 (또는 더미를 🏕️에) · 폭풍 차단, 쉬기 +12'},
+  {c:'fac', id:'windbreak', o:'windbreak', inp:[['bed',1],['rope',1],['stick',2]], on:'base', t:40, n:'🧶+🥢🥢 한 더미 → 🏕️ (기지 안 침상 하나가 바람막이로) · 비·폭풍 피해 줄임'},
+  {c:'fac', id:'fence', o:'fence', inp:[['log',3]], on:'base', t:90, n:'한 더미로 → 🏕️ 기지 안 · 밤짐승 차단'},
+  {c:'fac', id:'hut', o:'hut', inp:[['fence',1],['log',2],['leaf',3]], on:'base', t:180, n:'🪵🪵+🍃🍃🍃 한 더미 → 🏕️ (기지 안 울타리가 오두막으로) · 폭풍 차단, 쉬기 +12'},
   {c:'fac', id:'compost', o:'compost', inp:[['stick',2],['leaf',2]], on:'base', t:20, n:'한 더미로 → 🏕️ 기지'},
   {c:'fac', id:'humus', o:'humus', inp:[[['rotten','bone','weed'],1]], on:'compost', t:1440, n:'최대 3개 동시'},
-  {c:'fac', id:null, o:['🔨','침상 보수'], inp:[['leaf',1]], on:'bed', t:20, n:'🍃 +3 (폭풍 중 40분)'},
-  {c:'fac', id:null, o:['🔨','바람막이 보수'], inp:[[['leaf','stick','rope','vine'],1]], on:'windbreak', t:20, n:'🍃 +5, 🥢 +5, 🧶·➰ +10'},
+  {c:'fac', id:null, o:['🔨','침상 보수'], inp:[['leaf',1]], on:'base', fac:'bed', t:20, n:'🍃 +3 (폭풍 중 40분)'},
+  {c:'fac', id:null, o:['🔨','바람막이 보수'], inp:[[['leaf','stick','rope','vine'],1]], on:'base', fac:'windbreak', t:20, n:'🍃 +5, 🥢 +5, 🧶·➰ +10'},
   {c:'fac', id:null, o:['🔨','빗물 받이 보수'], inp:[[['leaf','stick'],1]], on:'catcher', t:20, n:'🍃·🥢 +5'},
-  {c:'fac', id:null, o:['🔨','울타리 보수'], inp:[[['log','stick'],1]], on:'fence', t:20, n:'🪵 +10, 🥢 +3'},
-  {c:'fac', id:null, o:['🔨','오두막 보수'], inp:[[['log','leaf'],1]], on:'hut', t:20, n:'🪵 +10, 🍃 +4'},
+  {c:'fac', id:null, o:['🔨','울타리 보수'], inp:[[['log','stick'],1]], on:'base', fac:'fence', t:20, n:'🪵 +10, 🥢 +3'},
+  {c:'fac', id:null, o:['🔨','오두막 보수'], inp:[[['log','leaf'],1]], on:'base', fac:'hut', t:20, n:'🪵 +10, 🍃 +4'},
   {c:'use', id:null, o:['🔎','장소 살피기'], inp:[], t:30, n:'장소 카드 탭 · 기운 −3 (밤 −5, 횃불 필요 · 해변·갯벌은 횃불 없이)'},
   {c:'use', id:'chop', o:'log', inp:[[['sharp','knife'],1,'tool']], on:'jungle', t:60, n:'🔺 60분 / 🔪 40분'},
   {c:'use', id:'fish_spear', o:'fish', inp:[['spear',1,'tool']], on:'sea', t:30, n:'60% · 기운 −10'},
@@ -1528,7 +1688,7 @@ const CTQ = {sharp:{t:'rcp'}, rope:{t:'rcp'}, reedrope:{t:'rcp'}, drill:{t:'rcp'
 for (const row of CT) {
   if (row.id && CTQ[row.id]) row.q = CTQ[row.id];
   else if (row.id && row.id.startsWith('cook_')) row.q = {t:'fix', a:[].concat(row.inp[0][0]), on:'fire'};
-  else if (!row.id && Array.isArray(row.o) && row.o[0] === '🔨') row.q = {t:'fix', a:[].concat(row.inp[0][0]), on:row.on};
+  else if (!row.id && Array.isArray(row.o) && row.o[0] === '🔨') row.q = row.fac ? {t:'repair', a:[].concat(row.inp[0][0]), fac:row.fac} : {t:'fix', a:[].concat(row.inp[0][0]), on:row.on};
   else if (!row.id && Array.isArray(row.o) && row.o[0] === '🪣') row.q = {t:'tapc'};
 }
 function freeCards(k) {
@@ -1550,11 +1710,11 @@ function ctPlan(row) {
     const r = RECIPES.find(x => x.id === row.id); if (!r) return null;
     let fst = null; const mats = [];
     for (const [k, n] of Object.entries(r.inp)) {
-      if (r.up && k === r.up) { fst = fixedSt(k); if (!fst) return {ok:false}; continue; }
+      if (r.up && k === r.up) { fst = BASEFAC.has(k) ? facT(k) : fixedSt(k); if (!fst) return {ok:false}; continue; }
       const got = ctPick(k === 'rope' ? ['rope', 'vine'] : [k], n, used); if (!got) return {ok:false, ...busy}; mats.push(...got);
     }
     const ings = mats.concat(fst ? fst.cards : []);
-    if (r.unique && r.unique.some(u => existsOutside(u, ings))) return {ok:false, r:`${K[r.out].e} ${K[r.out].n}은(는) 이미 있어요.`, s:'이미 있음'};
+    { const why = facBlock(r, ings); if (why) return {ok:false, r:why, s:why.includes('까지') ? '최대' : '이미 있음'}; }
     if (noEnergy(r.e)) return {ok:false, r:'기운이 없어요. 🏕️ 기지에서 쉬세요.', s:'기운 없음'};
     if (q.t === 'fac') { const base = fixedSt('base'); if (!base && !fst) return {ok:false}; return {ok:true, run:() => fst ? craft(r, fst, mats) : craft(r, {x:base.x, y:base.y + D.cellH, cards:[]}, mats)}; }
     const c0 = mats[0], st0 = stackOf(c0);
@@ -1565,6 +1725,12 @@ function ctPlan(row) {
     const a = ctPick(['stick'], 1, used), b = ctPick(['fiber'], 1, used); if (!a || !b) return {ok:false, ...busy};
     if (noEnergy(1)) return {ok:false, r:'기운이 없어요.', s:'기운 없음'};
     return {ok:true, run:() => { removeCards([a[0], b[0]]); torchFromFire(f); }};
+  }
+  if (q.t === 'repair') { // 기지 안 시설 보수: 가장 많이 닳은 것부터
+    const fs = (S.fac || []).filter(c => c.k === q.fac).sort((x, y) => fdOf(x) / fmax(x.k) - fdOf(y) / fmax(y.k)); if (!fs.length) return {ok:false};
+    if (fdOf(fs[0]) >= fmax(fs[0].k) - 1e-6) return {ok:false, r:`${K[q.fac].e} ${K[q.fac].n}은(는) 아직 튼튼해요.`, s:'튼튼함'};
+    for (const k of q.a) { const f = freeCards(k); if (!f.length) continue; const x = repairFac(f[f.length - 1], fs[0]); if (x && x.run) { if (noEnergy(1)) return {ok:false, r:'기운이 없어요.', s:'기운 없음'}; return {ok:true, run:x.run}; } }
+    return {ok:false, ...(q.a.some(k => allCards().some(c => c.k === k)) ? busy : {})};
   }
   if (q.t === 'tapc') { const c = allCards().find(x => x.k === 'catcher'); if (!c) return {ok:false}; if (!c.water) return {ok:false, r:'🪣 비어 있어요 (비 1시간마다·아침 이슬로 참)', s:'비어 있음'}; return {ok:true, run:() => drinkCatcher(c)}; }
   let first = null;
@@ -1594,6 +1760,7 @@ function ctState(row) {
   const miss = []; let any = false;
   for (const [ks, n] of row.inp) { const h = ctHave(ks); if (h > 0) any = true; if (h < n) miss.push([ks, n - h]); }
   if (row.on && !ctHave(row.on)) miss.push([row.on, 1]);
+  if (row.fac && !ctHave(row.fac)) miss.push([row.fac, 1]);
   const total = miss.reduce((a, m) => a + m[1], 0);
   if (!row.q) return {st: !miss.length ? 'have' : any ? 'pt' : 'no', miss, total};
   const p = ctPlan(row);
@@ -1640,7 +1807,7 @@ function flashKinds(kinds) {
   const ids = []; for (const st of S.stacks) { const top = st.cards[st.cards.length - 1]; for (const c of st.cards) if (kinds.includes(c.k)) { ids.push(c === top || st.cards.length === 1 ? c.id : top.id); break; } }
   for (const id of ids) { const el = els.get(id); if (el) el.classList.add('want'); }
   const first = ids.map(id => els.get(id)).filter(Boolean).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)[0];
-  if (first) { const b = $('#board'), r = first.getBoundingClientRect(), br = b.getBoundingClientRect(); if (r.top < br.top || r.bottom > br.bottom) b.scrollTop += r.top - br.top - 60; }
+  if (first) { const b = $('#board'), r = first.getBoundingClientRect(), br = b.getBoundingClientRect(); if (r.top < br.top || r.bottom > br.bottom) b.scrollTop += r.top - br.top - 60; if (r.left < br.left || r.right > br.right) b.scrollLeft += r.left - br.left - 40; }
   wantT = setTimeout(() => document.querySelectorAll('.card.want').forEach(e => e.classList.remove('want')), 3300);
   return ids.length;
 }
@@ -1674,12 +1841,12 @@ function showHelp() {
       <li><b>끌어서 놓기</b>: 카드를 다른 카드 위에 놓으면 조합하거나 쌓아요.</li>
       <li>같은 카드 <b>한 장 위에 한 장</b> = 조합 (예: 🪨+🪨 = 날 선 돌). 같은 카드 <b>더미 위</b>에 놓으면 그냥 쌓기.</li>
       <li>재료가 셋 이상인 조합은 <b>하나씩 차례로</b> 쌓아요. 맞지 않는 카드는 튕겨 나와요.</li>
-      <li>🏕️ <b>시설</b>(침상·빗물 받이·울타리·퇴비 더미)은 재료를 한 더미로 모아 <b>기지 카드 위에</b> 올려야 지어져요. 바람막이·오두막은 침상·울타리 위에 재료를 올려 업그레이드.</li>
-      <li>🔨 <b>시설 내구도</b>: 침상·바람막이·빗물 받이·울타리·오두막은 폭풍에 내구가 줄고 (오두막이 제일 느림, 침상이 제일 빠름) 0이 되면 부서져요. 맞는 재료를 시설 위에 올리면 보수 (20분, 폭풍 중 40분 + 몸이 더 식음): 🍃 잎·🥢 나뭇가지 → 침상·바람막이·빗물 받이, 🧶 노끈 → 바람막이 크게, 🪵 통나무 → 울타리·오두막.</li>
+      <li>🏕️ <b>기지</b>: 침상·바람막이·울타리·오두막은 <b>기지 안</b>에 들어가요. 재료를 한 더미로 모아 기지 카드에 올리면 지어지고 (바람막이·오두막은 그 재료 더미를 올리면 침상·울타리가 업그레이드), 기지를 탭하면 시설·내구도·🔨 보수·침상 배정을 봐요. 빗물 받이·퇴비 더미·모닥불은 보드에 남아요.</li><li>🛏️ <b>침상은 한 사람당 하나</b>: 선장이 먼저 써요. 침상이 없으면 바닥에서 자요 (선장: 기운 회복 +5/시간, 밤에 몸이 더 식음 · 동료: 밤에 포만감·수분이 조금 더 줄어요).</li>
+      <li>🔨 <b>시설 내구도</b>: 침상·바람막이·빗물 받이·울타리·오두막은 폭풍에 내구가 줄고 0이 되면 부서져요. 기지 패널의 🔨 버튼이나, 맞는 재료 한 장을 기지(빗물 받이는 그 카드)에 올리면 보수 (20분, 폭풍 중 40분): 🍃·🥢 → 침상·바람막이·빗물 받이, 🧶 → 바람막이, 🪵 → 울타리·오두막.</li>
       <li>🌊 <b>버리기</b>: 필요 없는 카드(도구·장소·시설 제외)를 얕은 바다에 끌어다 놓으면 사라져요 (시간 0분).</li>
       <li>🤢 상한 음식은 탭하면 먹을지 한 번 물어봐요. 🪱 퇴비 더미(나뭇가지 2 + 잎 2)에 넣으면 24시간 뒤 🟤 퇴비 (농사용, 다음 빌드).</li>
       <li>더미는 맨 위 한 장만 집혀요. <b>×N 표시</b>를 잡고 끌면 더미 통째로.</li>
-      <li><b>탭</b>: 먹기·마시기, 장소 살피기(30분). <b>🏕️ 기지 탭 = 쉬기</b>.</li>
+      <li><b>탭</b>: 먹기·마시기, 장소 살피기(30분). <b>🏕️ 기지 탭 = 기지 안 보기·쉬기</b>.</li>
       <li>도구는 장소·카드 위에 올려서 써요. 🌴 정글←날 선 돌(통나무), 🌊 얕은 바다←창·낚싯대, 🥥←🪨 돌·날 선 돌. 🥢+🌾 더미→🔥 = 횃불.</li>
       <li>음식을 🔥 모닥불에 올리면 20분 뒤 익어요 (다른 행동이나 쉬기로 시간이 흘러야 함).</li>
       <li><b>시간은 행동할 때만 흘러요.</b> 생각하는 시간은 공짜.</li>
@@ -1690,6 +1857,8 @@ function showHelp() {
       <li>날생선·고인 빗물·강물은 배탈 위험 (탭하면 바로 먹어요). 🔥에 굽거나 끓이거나, 빗물 받이 물을 마셔요.</li>
       <li>🏝️ <b>갯벌</b>은 썰물(하루 2번, 2시간) 때만 열려요. 썰물 시각은 매일 1시간씩 늦어져요.</li>
       <li>⛈️ <b>7일마다 큰 폭풍</b>(12:00~다음 날 06:00), 비가 사흘 이어지면 작은 폭풍. 🛖 오두막(울타리 + 통나무 2 + 잎 3)이 없으면 체력 −8/시간(⛺ 바람막이 −3), 몸이 빠르게 식고 불이 꺼지고 시설 내구가 닳아요. 오두막 없이는 쉬어도 기운이 회복되지 않아요.</li>
+      <li>🎯 <b>선장의 할 일</b>: 화면 위 초록 줄이 지금 할 일이에요. 탭하면 방법·진행도·보상. 끝내면 재료 보상이 기지 옆에 생겨요.</li>
+      <li>↔️ <b>넓은 보드</b>: 보드는 화면보다 넓어요. <b>빈 곳을 끌면</b> 움직이고, 카드를 화면 가장자리로 끌고 가면 저절로 밀려요. 정렬은 지금 보이는 곳에 모아요.</li>
       <li><b>정렬</b> 버튼: 카드를 종류별로 모아 정리. 카드를 <b>0.5초 꾹 눌렀다 떼면 📌 고정</b> — 고정한 카드는 정렬해도 그 자리에 있어요 (끌어서 옮기면 새 자리에 고정).</li>
       <li>📜 <b>조합표</b>(아래 버튼)에 모든 조합이 처음부터 다 보여요. 지금 만들 수 있는 건 초록, 탭하면 필요한 카드가 반짝여요.</li>
       <li>💧 <b>물</b>: 🥥 코코넛(해변·정글, 🪨 돌로도 깸), ⛰️ 바위턱 웅덩이, 🪣 빗물 받이(잎+가지, 아침 이슬), 🏞️ 강(정글 탐사 50%)의 강물은 🔥에 끓여 마셔요.</li>
@@ -1813,6 +1982,8 @@ const ACTIONS = {
   endLeave() { const p = S.endPending; if (p) finishEnding(p.type, p.crew, false); },
   endStay() { const p = S.endPending; if (p) finishEnding(p.type, p.crew, true); },
   dbg(b) { DBG[b.dataset.f](); closeSheet(); },
+  fix(b) { const c = (S.fac || []).find(x => x.id === +b.dataset.id); closeSheet(); if (!c || S.dead) return; const a = repairMat(c); if (!a) return toast(`보수 재료: ${fixList(c.k)}`); const rp = repairFac(a, c); if (rp && rp.run) { if (!canAct(rp.e || 0)) return render(); rp.run(); } else if (rp && rp.msg) toast(rp.msg); },
+  goalCraft() { closeSheet(); setTimeout(() => showCraft(), 50); },
   eatRotten(b) { closeSheet(); const c = allCards().find(x => x.id === +b.dataset.id && x.k === 'rotten'); if (c && !S.dead) eat(c); },
   giveup() { if (!confirm('이번 삶을 포기하고 정산할까요?')) return; S.lastCause = '포기'; die(); render(); showDeath(); },
   wipe() { if (!confirm('각인 점수·도감·특성을 모두 지울까요?')) return; try { localStorage.removeItem(RUN_KEY); localStorage.removeItem(META_KEY); } catch (e) {} location.reload(); },
@@ -2275,6 +2446,7 @@ function feedCrew(food, cc) {
       cc.k = 'cw_' + c.id; cc.h = Math.max(cc.h, 50); cc.w = Math.max(cc.w, 50); cc.job = 'base'; cc.act = '기지 대기';
       S.crew.st[c.id] = 'mate'; rosterOf(c.id).met = 1; saveMeta(); SND.q('discover');
       say(`🙌 "선장님…!" ${c.role[sIdx()]} ${c.n}${josa(c.n, '이', '가')} 동료가 됐다.`, 'disc');
+      { const bp = bedPlan(); if (bp.beds < bp.n) say(`${bedStr(bp)} — 누울 자리가 모자라다. 🍃 잎 ×2를 🏕️ 기지에.`); }
     } else say(`${d.e} ${c.n}에게 ${d.n}을(를) 줬다. 포만감 ${Math.round(cc.h)} · 수분 ${Math.round(cc.w)}`);
   });
 }
@@ -2368,6 +2540,7 @@ function crewWork(m) {
   }
   if (j === 'signal') m.act = '배 지켜봄';
 }
+const CREW_FLOOR = .5; // 침상 없는 동료: 밤 1시간마다 포만감·수분 −0.5 더 (밤새 약 −6)
 const RAWOK = x => K[x.k].cook && !isMate(x) && !isTired(x);
 function crewFire(m, dayTime) {
   const f = allCards().find(x => x.k === 'fire');
@@ -2412,6 +2585,7 @@ function crewFeedAll() {
 function crewHour(m) {
   if (!S.crew) return;
   const h = m / 60, dayWork = m >= 360 && m <= 1080;
+  const floorM = new Set(bedPlan().floor.filter(p => p.m).map(p => p.m));
   for (const c of crewCards()) {
     c.h = clamp((c.h || 0) - 1.5); c.w = clamp((c.w || 0) - 2);
     if (isMate(c)) crewEat(c);
@@ -2423,7 +2597,7 @@ function crewHour(m) {
     if (c.h <= 10 || c.w <= 10) { c.act = '허기 (음식·물 필요)'; continue; }
     if (!c.job) { c.act = '할 일 없음'; continue; }
     if (c.job === 'fire') { crewFire(c, dayWork); continue; }
-    if (!dayWork) { c.act = '잠'; continue; }
+    if (!dayWork) { if (floorM.has(c)) { c.h = clamp(c.h - CREW_FLOOR); c.w = clamp(c.w - CREW_FLOOR); c.act = '바닥에서 잠 🥶'; } else c.act = '잠 🛏️'; continue; }
     crewWork(c);
   }
   if (m === 360 || m === 1080) crewFeedAll();
@@ -2651,7 +2825,7 @@ const TUT = [
    alt:() => !tAliveTrace() && !crewCards().length && {t:'흔적을 다시 찾는다.', h:`${K[CREWBY[tutCrew()].at].e} 탭`, hl:() => tPlace(CREWBY[tutCrew()].at)}},
   {id:'feed', story:1, g:'먹일 것이 없다.', t:() => { const m = allCards().find(isTired); return m ? `${cOf(m).n}${josa(cOf(m).n, '이', '')}다! 쓰러져 있다.` : '찾았다.'; }, h:() => { const m = allCards().find(isTired); return `💧·🐚→${m ? cOf(m).e : '👤'}`; }, need:[[tFeed, 1, 'beach', 'clam', '🐚']], hl:() => tTops(isTired, 1).concat(tTops(tFeed, 1)), done:() => tMates().length > 0},
   {id:'job', story:1, t:() => { const m = tMates()[0]; return !m ? '' : cOf(m).id === 'sot' ? '솥에겐 불이 제자리다.' : `${cOf(m).n}에게 일을 맡긴다.`; }, h:() => { const m = tMates()[0]; return m ? `${cOf(m).e}→🔥` : ''; }, hl:() => tTops(isMate, 1).concat(tKind('fire', 1), tKind('firex', 1)), done:() => tMates().some(m => m.job && m.job !== 'base')},
-  {id:'goal', t:() => S.crew ? '일곱 모두 집에 보낸다.' : '오래 버틴다.', h:() => S.crew ? '🗼신호대·🛶뗏목 → 📖' : '밤엔 🏕️ 탭', hl:() => S.crew ? [] : tPlace('base'), done:() => false, end:1},
+  {id:'goal', t:() => S.crew ? '일곱 모두 집에 보낸다.' : '오래 버틴다.', h:'끝 → 🎯 할 일', hl:() => [], done:() => false, end:1},
 ];
 const tutSteps = () => TUT.filter(s => !s.story || (S && S.crew));
 function tutCur() {
@@ -2683,7 +2857,9 @@ function tutCheck(quiet) {
   if (moved && !quiet) { SND.q('discover'); S.tut.flash = 1; }
 }
 function tutEnd(skip) {
-  S.tut = null; meta.tutDone = 1; saveMeta(); saveRun(); tutPaint(); render();
+  S.tut = null; meta.tutDone = 1; saveMeta();
+  if (!S.goal) S.goal = {i:0};
+  goalCheck(); saveRun(); tutPaint(); render(); setTimeout(flush, 900);
   toast(skip ? '안내는 ⋯ 메뉴에서 다시 볼 수 있어요.' : '🎓 모든 조합은 📜 조합표에 있어요.', skip ? '' : 'good');
 }
 function tutPaint() {
@@ -2700,6 +2876,61 @@ $('#tut').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b || !S || !S.tut) return;
   if (b.dataset.tut === 'skip' || b.dataset.tut === 'end') tutEnd(b.dataset.tut === 'skip');
 });
+/* ---------- 🎯 선장의 할 일 (튜토리얼이 끝나면 화면 위 한 줄) ----------
+   e = 아이콘, t = 선장 혼잣말(짧게), h = 방법, p() = [지금, 목표], ok() = 완료 판정(없으면 p로), rw = 보상 카드 (기지 옆에 생김), end = 엔딩으로 끝나는 마지막 할 일 */
+const GOALS = [
+  {id:'fire', e:'🔥', t:'해 지기 전에 불부터.', h:'✨ 불씨 + 🥢 → 🔥 모닥불', p:() => [+(tHas('fire') || tHas('firex')), 1], rw:{stick:2}},
+  {id:'bed', e:'🛏️', t:'누울 자리가 필요하다.', h:'🍃 잎 ×2 더미 → 🏕️ 기지', p:() => [Math.min(1, bedCards().length), 1], rw:{leaf:2}},
+  {id:'night', e:'🌙', t:'첫날 밤을 넘긴다.', h:'밤(18시~)엔 🏕️ 기지 탭 → 아침까지 자기', p:() => [Math.min(1, S.life.surv), 1], rw:{coco:1, rainw:1}},
+  {id:'water', e:'💧', t:'물을 받아 둘 데가 있어야 한다.', h:'🍃 + 🥢 더미 → 🏕️ 기지 = 🪣 빗물 받이', p:() => [+tHas('catcher'), 1], rw:{clam:2}},
+  {id:'crew', e:'👣', story:1, t:'일곱 명. 한 명이라도 찾는다.', h:'장소를 살피다 👣 흔적 → 그 장소 카드에 · 지친 선원에게 물·음식', p:() => [Math.min(1, mates().length), 1], rw:{coco:2}},
+  {id:'beds', e:'🛏️', story:1, t:'다들 누울 자리가 있어야 한다.', h:'사람 수만큼 침상 · 🍃 ×2 더미 → 🏕️ 기지', p:() => { const b = bedPlan(); return [Math.min(b.beds, b.n), b.n]; }, ok:() => { const b = bedPlan(); return b.n >= 2 && b.beds >= b.n; }, rw:{rope:1}},
+  {id:'fence', e:'🚧', t:'밤마다 짐승이 온다. 울타리를.', h:'🪵 통나무 ×3 더미 → 🏕️ 기지 (통나무: 🔺 → 🌴 정글)', p:() => [+(tHas('fence') || tHas('hut')), 1], rw:{log:1}},
+  {id:'hut', e:'🛖', t:'폭풍을 막을 지붕이 필요하다.', h:'🪵 ×2 + 🍃 ×3 더미 → 🏕️ 기지 (울타리가 오두막으로)', p:() => [+tHas('hut'), 1], rw:{rope:2, log:1}},
+  {id:'way', e:'🗼', story:1, t:'집에 갈 방법을 만든다.', h:'🗼 신호대 (🪵×2 + 🍃×4) 또는 🛶 뗏목 (🪵×4 + 🧶×4 + 🍃×2) 더미 → 🏕️ 기지', p:() => [+(tHas('signal') || tHas('raft') || tHas('bigraft')), 1], rw:{torch:1}},
+  {id:'home', e:'🚢', story:1, end:1, t:'이 섬을 떠난다.',
+   h:() => tHas('signal') ? (S.rescueReady ? '🟡 연기를 올렸다. 다음 맑은 아침에 배가 온다.' : (S.ships || 0) >= 3 ? '맑은 낮에 🕯️ 횃불(또는 ✨ 불씨) → 🗼 신호대' : '맑은 아침마다 🗼 신호대에서 배를 본다 (3번 보면 연기)') : '큰 폭풍이 지난 다음 날 06~12시, 🛶 뗏목 → 🌊 얕은 바다 (물·구운 음식 챙기기)',
+   p:() => tHas('signal') ? [Math.min(3, S.ships || 0) + (S.rescueReady ? 1 : 0), 4] : [0, 1]},
+  {id:'last', e:'🗓️', nostory:1, end:1, t:'오래 버틴다.', h:'밤엔 🏕️ 기지에서 자기', p:() => [S.life.surv, Math.max(7, meta.bestDays + 1)]},
+];
+const goalList = () => GOALS.filter(g => S && S.crew ? !g.nostory : !g.story);
+const goalCur = () => (S && S.goal) ? goalList()[S.goal.i] || null : null;
+const goalVal = (g, k) => typeof g[k] === 'function' ? g[k]() : g[k];
+const goalOk = g => g.ok ? g.ok() : (p => p[0] >= p[1])(g.p());
+const goalOn = () => !!(S && S.goal && !S.tut && !S.dead && !S.pre && !QS.has('nogoal')); // ?nogoal = 할 일 끔 (예전 테스트용)
+const rwStr = rw => Object.entries(rw).map(([k, n]) => `${K[k].e}${n > 1 ? '×' + n : ''}`).join(' ');
+function goalCheck(quiet) {
+  if (!goalOn()) return;
+  const gs = goalList(), got = {}; let n = 0, last = null;
+  while (S.goal.i < gs.length && !gs[S.goal.i].end && goalOk(gs[S.goal.i])) {
+    const g = gs[S.goal.i]; S.goal.i++; n++; last = g;
+    if (!quiet && g.rw) for (const [k, v] of Object.entries(g.rw)) { for (let j = 0; j < v; j++) { const c = mk(k); spawnNear(c, baseSt()); flashIds.add(c.id); } got[k] = (got[k] || 0) + v; }
+  }
+  if (!n || quiet) return;
+  S.goal.flash = 1; SND.q('discover');
+  say(`🎯 ${n > 1 ? `할 일 ${n}개 끝!` : `${last.e} 해냈다.`}${Object.keys(got).length ? ' 보상 ' + rwStr(got) : ''}`, 'good');
+  const nx = gs[S.goal.i]; if (nx) say(`🎯 다음: ${nx.e} ${nx.t}`, 'disc');
+}
+function goalPaint() {
+  const el = $('#goal'), g = goalOn() ? goalCur() : null;
+  if (!g) { if (!el.hidden) { el.hidden = true; measure(); } return; }
+  const [a, b] = g.p();
+  const html = `<span>🎯</span><span class="gt">${g.t}</span><span class="gp">${g.e} ${Math.min(a, b)}/${b}</span><span class="gx">›</span>`;
+  if (el._h !== html) { el.innerHTML = html; el._h = html; }
+  if (S.goal.flash) { delete S.goal.flash; el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+  if (el.hidden) { el.hidden = false; measure(); }
+}
+function showGoal() {
+  const g = goalCur(); if (!g || !goalOn()) return;
+  const gs = goalList(), i = S.goal.i, [a, b] = g.p();
+  $('#sheet').dataset.modal = '';
+  sheet(`<h2>🎯 선장의 할 일 <span class="muted">${i + 1}/${gs.length}</span></h2>
+    <p style="font-size:17px;margin:4px 0 6px"><b>${g.e} ${g.t}</b></p>
+    <p>${goalVal(g, 'h')}<br>진행 <b>${Math.min(a, b)}/${b}</b>${g.rw ? ` · 보상 ${rwStr(g.rw)}` : g.end ? ' · 끝내면 엔딩' : ''}</p>
+    <div class="gsteps">${gs.map((x, j) => `<span class="${j < i ? 'done' : j === i ? 'cur' : 'next'}">${j < i ? '✔' : x.e}</span>`).join('')}</div>
+    <div class="btns"><button data-act="goalCraft">📜 조합표</button><button class="pri" data-close>닫기</button></div>`);
+}
+$('#goal').addEventListener('click', () => { if (S && !S.dead) showGoal(); });
 const ESSENTIAL = ['sharp','rope','drill','ember','campfire','cook_clamc','bed','rescue','signal','raft'];
 /* ---------- 시작 ---------- */
 function boot() {
@@ -2715,6 +2946,8 @@ function boot() {
     if (!S.st100) { S.hunger = 100 - S.hunger; S.thirst = 100 - S.thirst; S.st100 = 1; saveRun(); } // 〔v0.5〕 상태 100 기준으로 옮기기
     if (typeof S.temp !== 'number' || S.temp > 45) { S.temp = 36.5; saveRun(); }
     for (const c of allCards()) if (FAC[c.k] && c.fd === undefined) c.fd = FAC[c.k].max; // 〔v0.5 확정: 시설 내구도·보수〕 예전 시설은 내구 가득 // 〔v0.5 확정: 체온〕 예전 저장은 36.5℃로 시작
+    if (facSync()) saveRun(); // 〔기지 안 시설〕 보드 위 침상·바람막이·울타리·오두막 → 기지 안
+    if (!S.goal) { S.goal = {i:0}; if (!S.tut) goalCheck(true); saveRun(); } // 〔할 일〕 이미 해낸 것은 보상 없이 넘김
     if (S.dead) { render(); if (S.ending) showEnding(); else showDeath(); return; }
     sortBoardIfOff(); render();
     if (S.endPending) { endingFlow(S.endPending.type, S.endPending.crew); return; }
@@ -2723,8 +2956,8 @@ function boot() {
   else { newGame([], false, null, true); render(); pickTraits = (meta.lastTraits || []).filter(id => meta.unlocked[id]); pickNaked = false; showTraits(); return; }
   if (!meta.seenHelp) showHelp();
 }
-function sortBoardIfOff() { if (S.stacks.some(st => st.x + D.cw > D.W + 2)) sortBoard(true); }
-window.__game = {cardMenu, ctPlan, DROP_PAD, R:RATE, FUEL, easy, easyW, CT, ctState, showCraft, BOOK, tut:{TUT, tutCur, tutSteps, tutStart, tutEnd}, story:{CREW, mates, mateOf, crewHour, learn, endingFlow, finishEnding, DBG, showIntro, closeIntro, homeN, homeAll, pickCrew, SHIPS, END}, fi:(a, b) => fixedInteraction(a, b, stackOf(b)), snd:SND, tide:{open:() => flatOpen(), windows:tideWindows}, get S() { return S; }, get meta() { return meta; }, sortBoard, render, D, K, advance:(m) => { advance(m); after(); }};
+function sortBoardIfOff() { if (S.stacks.some(st => st.x + D.cw > D.FW + 2)) sortBoard(true); }
+window.__game = {facRowHTML, baseHTML, goal:{GOALS, goalList, goalCur, goalCheck, showGoal}, bedPlan, facSync, restRate, openRest, BASEFAC, cardMenu, ctPlan, DROP_PAD, R:RATE, FUEL, easy, easyW, CT, ctState, showCraft, BOOK, tut:{TUT, tutCur, tutSteps, tutStart, tutEnd}, story:{CREW, mates, mateOf, crewHour, learn, endingFlow, finishEnding, DBG, showIntro, closeIntro, homeN, homeAll, pickCrew, SHIPS, END}, fi:(a, b) => fixedInteraction(a, b, stackOf(b)), snd:SND, tide:{open:() => flatOpen(), windows:tideWindows}, get S() { return S; }, get meta() { return meta; }, sortBoard, render, D, K, advance:(m) => { advance(m); after(); }};
 boot();
 </script>
 </body>
